@@ -45,10 +45,30 @@ The practical consequences:
   this module does not either. The JSON will be shown as text by whatever
   filters the new format runs.
 
-## Toolbar
+## Editing experience
 
-Bold, italic, heading 2, heading 3, bulleted list, numbered list and link.
-Each button can be turned off per text format in the editor settings form.
+The toolbar offers bold, italic, heading 2, heading 3, bulleted list, numbered
+list and link. Each button can be turned off per text format in the editor
+settings form.
+
+- **Keyboard shortcuts.** Ctrl/Cmd+B and Ctrl/Cmd+I come from the Portable Text
+  editor itself, as do Tab and Shift+Tab for list indenting. Ctrl/Cmd+K opens
+  the link field. Button tooltips show the shortcut using the modifier the
+  visitor's platform actually uses.
+- **Links.** With the caret inside a link the button reads "Edit link" and the
+  field opens with the current URL, offering Update and Remove. Otherwise it
+  adds a link to the selection. Enter applies, Escape cancels. The field is a
+  row of its own so opening it does not move the toolbar.
+- **Keyboard navigation.** The toolbar is a single tab stop, with arrow keys,
+  Home and End moving between buttons, so Tab reaches the writing area without
+  passing through every button.
+- **Empty state.** An empty editor shows the textarea's own placeholder, or
+  "Start writing…" when it has none.
+- **No flash of raw JSON.** Until the editor attaches, the textarea would show
+  the stored Portable Text JSON, so the stylesheet hides it while keeping its
+  space. If the editor never arrives, for instance because its JavaScript
+  failed to load, the textarea is handed back after three seconds rather than
+  leaving an invisible field behind.
 
 ## Requirements
 

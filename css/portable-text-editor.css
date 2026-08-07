@@ -3,10 +3,43 @@
  * Styles for the Portable Text editor.
  */
 
+/*
+ * Until the editor attaches, the textarea shows the raw Portable Text JSON.
+ * Hiding it while it still reserves its space keeps that out of sight without
+ * the page jumping when the editor replaces it. Scoped to html.js so the
+ * textarea stays usable when JavaScript never runs, and to the value textarea
+ * so that a sibling such as "Edit summary", which no editor ever un-hides,
+ * is left alone.
+ */
+html.js
+  .js-text-format-wrapper:has(
+    select[data-editor-for] option[value="portable_text"]:checked,
+    input[type="hidden"][value="portable_text"]
+  )
+  textarea[name$="[value]"] {
+  visibility: hidden;
+  /*
+   * If the editor never arrives, for instance because its JavaScript failed to
+   * load, hand the textarea back instead of leaving an invisible field behind.
+   */
+  animation: portable-text-editor-reveal 0s linear 3s forwards;
+}
+
+@keyframes portable-text-editor-reveal {
+  to {
+    visibility: visible;
+  }
+}
+
 .portable-text-editor {
   border: 1px solid #b7b7b7;
   border-radius: 2px;
   background: #fff;
+}
+
+.portable-text-editor:focus-within {
+  border-color: #26a769;
+  box-shadow: 0 0 0 1px #26a769;
 }
 
 .portable-text-editor__toolbar {
@@ -25,10 +58,11 @@
   background: transparent;
   cursor: pointer;
   font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .portable-text-editor__button:hover,
-.portable-text-editor__button:focus {
+.portable-text-editor__button:focus-visible {
   border-color: #b7b7b7;
   background: #fff;
 }
@@ -39,23 +73,47 @@
   font-weight: bold;
 }
 
+.portable-text-editor__button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.portable-text-editor__link-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-bottom: 1px solid #b7b7b7;
+  background: #fcfcfa;
+}
+
+.portable-text-editor__link-label {
+  font-size: 0.875rem;
+  font-weight: bold;
+}
+
 .portable-text-editor__link-input {
-  width: 18em;
-  max-width: 100%;
-  padding: 3px 6px;
+  flex: 1 1 16em;
+  min-width: 0;
+  padding: 4px 6px;
   border: 1px solid #b7b7b7;
   border-radius: 2px;
 }
 
 .portable-text-editor__editable {
-  min-height: 12em;
   padding: 8px 12px;
   overflow-wrap: break-word;
 }
 
 .portable-text-editor__editable:focus {
-  outline: 2px solid #26a769;
-  outline-offset: -2px;
+  outline: none;
+}
+
+.portable-text-editor__placeholder {
+  position: absolute;
+  color: #757575;
+  pointer-events: none;
 }
 
 .portable-text-editor__link {

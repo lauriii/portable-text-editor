@@ -6,7 +6,7 @@
  * js/portable-text-editor.js.
  */
 
-import { StrictMode, useEffect, useReducer, useState } from 'react';
+import { StrictMode, useEffect, useId, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   EditorProvider,
@@ -17,6 +17,8 @@ import {
 } from '@portabletext/editor';
 import { EventListenerPlugin } from '@portabletext/editor/plugins';
 import {
+  getFocusSpan,
+  getFocusTextBlock,
   isActiveAnnotation,
   isActiveDecorator,
   isActiveListItem,
@@ -30,20 +32,29 @@ const schemaDefinition = defineSchema({
   annotations: [{ name: 'link', fields: [{ name: 'href', type: 'string' }] }],
 });
 
+// How this platform writes the modifier the editor's built-in shortcuts use.
+// The match is case insensitive because userAgentData reports "macOS" while
+// the older navigator.platform reports "MacIntel".
+const MOD = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform || navigator.platform || '')
+  ? '⌘'
+  : 'Ctrl+';
+
 /**
  * Toolbar buttons, keyed by the IDs the Editor plugin stores in config.
  *
  * `selector` reports whether the button is currently applied, `event` is the
- * editor event a click sends.
+ * editor event a click sends, and `shortcut` is shown in the button's tooltip.
  */
 const BUTTONS = {
   bold: {
     label: Drupal.t('Bold'),
+    shortcut: `${MOD}B`,
     selector: isActiveDecorator('strong'),
     event: { type: 'decorator.toggle', decorator: 'strong' },
   },
   italic: {
     label: Drupal.t('Italic'),
+    shortcut: `${MOD}I`,
     selector: isActiveDecorator('em'),
     event: { type: 'decorator.toggle', decorator: 'em' },
   },
@@ -96,20 +107,62 @@ function useEditorState(editor, selector) {
   return selector(editor.getSnapshot());
 }
 
-function ToolbarButton({ id }) {
+/**
+ * Runs an editor event once the focus the editor was just given has landed.
+ *
+ * The editor ignores document changes while it is blurred, which is the state
+ * it is in whenever a toolbar control took the focus.
+ *
+ * @param {object} editor
+ *   The editor from useEditor().
+ * @param {object} event
+ *   The editor event to send.
+ */
+function sendWhenFocused(editor, event) {
+  editor.send({ type: 'focus' });
+  requestAnimationFrame(() => editor.send(event));
+}
+
+/**
+ * Moves focus between toolbar buttons, making the toolbar a single tab stop.
+ *
+ * @param {object} event
+ *   The React keydown event on the toolbar.
+ */
+function onToolbarKeyDown(event) {
+  const offset = { ArrowRight: 1, ArrowLeft: -1, Home: -Infinity, End: Infinity }[event.key];
+  if (offset === undefined) {
+    return;
+  }
+  const buttons = Array.from(event.currentTarget.querySelectorAll('button'));
+  const from = buttons.indexOf(document.activeElement);
+  if (from === -1) {
+    return;
+  }
+  event.preventDefault();
+  const to = Math.min(buttons.length - 1, Math.max(0, from + offset));
+  buttons.forEach((button, index) => {
+    button.tabIndex = index === to ? 0 : -1;
+  });
+  buttons[to].focus();
+}
+
+function ToolbarButton({ id, index }) {
   const editor = useEditor();
   const active = useEditorState(editor, BUTTONS[id].selector);
-  const { label, event } = BUTTONS[id];
+  const { label, shortcut } = BUTTONS[id];
 
   return (
     <button
       type="button"
       className="portable-text-editor__button"
       aria-pressed={active}
+      tabIndex={index === 0 ? 0 : -1}
+      title={shortcut ? `${label} (${shortcut})` : label}
       // Keep the selection in the editable while the button is used.
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
-        editor.send(event);
+        editor.send(BUTTONS[id].event);
         editor.send({ type: 'focus' });
       }}
     >
@@ -118,84 +171,141 @@ function ToolbarButton({ id }) {
   );
 }
 
-/**
- * Toggles a link, asking for the URL in an inline field when adding one.
- *
- * ponytail: an inline field rather than window.prompt, because a native modal
- * cannot be reached by keyboard users predictably and blocks automated tests.
- */
-function LinkButton() {
+function LinkButton({ index, open, onOpen }) {
   const editor = useEditor();
   const active = useEditorState(editor, isActiveAnnotation('link'));
-  // A string means the URL field is open; null means it is closed.
-  const [href, setHref] = useState(null);
-
-  const close = () => {
-    setHref(null);
-    editor.send({ type: 'focus' });
-  };
-
-  if (href !== null) {
-    return (
-      <span className="portable-text-editor__link-form">
-        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-        <input
-          type="text"
-          autoFocus
-          className="portable-text-editor__link-input"
-          aria-label={Drupal.t('Link URL')}
-          placeholder="https://"
-          value={href}
-          onChange={(e) => setHref(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              close();
-            }
-            if (e.key !== 'Enter') {
-              return;
-            }
-            e.preventDefault();
-            if (href !== '') {
-              // The editor keeps its own selection while this field has DOM
-              // focus, but it ignores changes while it is blurred, so the
-              // toggle waits until the focus it was given has landed.
-              editor.send({ type: 'focus' });
-              requestAnimationFrame(() => {
-                editor.send({
-                  type: 'annotation.toggle',
-                  annotation: { name: 'link', value: { href } },
-                });
-              });
-            }
-            close();
-          }}
-        />
-      </span>
-    );
-  }
 
   return (
     <button
       type="button"
       className="portable-text-editor__button"
-      aria-pressed={active}
+      aria-pressed={active || open}
+      aria-expanded={open}
+      tabIndex={index === 0 ? 0 : -1}
+      title={`${active ? Drupal.t('Edit link') : Drupal.t('Link')} (${MOD}K)`}
       onMouseDown={(e) => e.preventDefault()}
-      onClick={() => {
-        // Removing a link only needs the annotation name, so the URL is asked
-        // for just when one is being added.
-        if (active) {
-          editor.send({
-            type: 'annotation.toggle',
-            annotation: { name: 'link', value: {} },
-          });
-          editor.send({ type: 'focus' });
-          return;
-        }
-        setHref('');
-      }}
+      onClick={onOpen}
     >
-      {Drupal.t('Link')}
+      {active ? Drupal.t('Edit link') : Drupal.t('Link')}
     </button>
+  );
+}
+
+/**
+ * The URL field, shown on its own row so the toolbar does not move.
+ *
+ * ponytail: an inline row rather than window.prompt, because a native modal
+ * cannot be reached by keyboard users predictably and blocks automated tests.
+ */
+function LinkForm({ onClose }) {
+  const editor = useEditor();
+  // The link being edited has to be read before the field takes the focus,
+  // because that moves the selection out of the editor.
+  const [target] = useState(() => {
+    const snapshot = editor.getSnapshot();
+    const block = getFocusTextBlock(snapshot);
+    const span = getFocusSpan(snapshot);
+    if (!block || !span) {
+      return null;
+    }
+    // A span's marks are either decorator names or keys of the block's mark
+    // definitions, which is where a link keeps its URL.
+    const markDefs = block.node.markDefs || [];
+    const link = (span.node.marks || [])
+      .map((mark) => markDefs.find((markDef) => markDef._key === mark))
+      .find((markDef) => markDef && markDef._type === 'link');
+    if (!link) {
+      return null;
+    }
+    return {
+      href: typeof link.href === 'string' ? link.href : '',
+      // @see the "annotation.set" behavior, which expects a path ending in the
+      // mark definition's key.
+      at: [...block.path, 'markDefs', { _key: link._key }],
+      // Removing needs a selection that covers the link rather than a path,
+      // and the caret alone does not qualify.
+      // ponytail: the focused span is the whole link unless a decorator splits
+      // it; widen this to the neighbouring spans if that ever matters.
+      range: {
+        anchor: { path: span.path, offset: 0 },
+        focus: { path: span.path, offset: (span.node.text || '').length },
+      },
+    };
+  });
+  const [href, setHref] = useState(target ? target.href : '');
+  // More than one editor can be on a page, so the field needs its own id.
+  const fieldId = useId();
+
+  const close = () => {
+    onClose();
+    editor.send({ type: 'focus' });
+  };
+
+  const apply = () => {
+    if (href === '') {
+      return;
+    }
+    onClose();
+    if (target && target.at) {
+      // Changing an existing link edits its mark definition in place, so it
+      // works even when nothing is selected.
+      editor.send({ type: 'annotation.set', at: target.at, props: { href } });
+      editor.send({ type: 'focus' });
+      return;
+    }
+    sendWhenFocused(editor, {
+      type: 'annotation.toggle',
+      annotation: { name: 'link', value: { href } },
+    });
+  };
+
+  const remove = () => {
+    onClose();
+    editor.send({
+      type: 'annotation.remove',
+      annotation: { name: 'link' },
+      at: target.range,
+    });
+    editor.send({ type: 'focus' });
+  };
+
+  return (
+    <div className="portable-text-editor__link-form">
+      <label className="portable-text-editor__link-label" htmlFor={fieldId}>
+        {Drupal.t('Link URL')}
+      </label>
+      {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+      <input
+        type="text"
+        autoFocus
+        id={fieldId}
+        className="portable-text-editor__link-input"
+        placeholder="https://"
+        value={href}
+        onChange={(e) => setHref(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            apply();
+          }
+        }}
+      />
+      <button type="button" className="portable-text-editor__button" disabled={href === ''} onClick={apply}>
+        {target ? Drupal.t('Update') : Drupal.t('Apply')}
+      </button>
+      {target ? (
+        <button type="button" className="portable-text-editor__button" onClick={remove}>
+          {Drupal.t('Remove')}
+        </button>
+      ) : null}
+      <button type="button" className="portable-text-editor__button" onClick={close}>
+        {Drupal.t('Cancel')}
+      </button>
+    </div>
   );
 }
 
@@ -213,12 +323,19 @@ function renderDecorator(props) {
 
 function renderAnnotation(props) {
   if (props.schemaType.name === 'link') {
-    return <span className="portable-text-editor__link">{props.children}</span>;
+    return (
+      <span className="portable-text-editor__link" title={props.value.href}>
+        {props.children}
+      </span>
+    );
   }
   return props.children;
 }
 
-function Editor({ toolbar, initialValue, ariaLabel, onValue }) {
+function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const hasLink = toolbar.includes('link');
+
   return (
     <EditorProvider initialConfig={{ schemaDefinition, initialValue }}>
       <EventListenerPlugin
@@ -228,17 +345,42 @@ function Editor({ toolbar, initialValue, ariaLabel, onValue }) {
           }
         }}
       />
-      <div className="portable-text-editor__toolbar">
-        {toolbar.map((id) =>
-          id === 'link' ? <LinkButton key={id} /> : <ToolbarButton key={id} id={id} />,
+      <div
+        className="portable-text-editor__toolbar"
+        role="toolbar"
+        aria-label={Drupal.t('Text editor toolbar')}
+        onKeyDown={onToolbarKeyDown}
+      >
+        {toolbar.map((id, index) =>
+          id === 'link' ? (
+            <LinkButton
+              key={id}
+              index={index}
+              open={linkOpen}
+              onOpen={() => setLinkOpen(true)}
+            />
+          ) : (
+            <ToolbarButton key={id} id={id} index={index} />
+          ),
         )}
       </div>
+      {linkOpen ? <LinkForm onClose={() => setLinkOpen(false)} /> : null}
       <PortableTextEditable
         className="portable-text-editor__editable"
+        style={{ minHeight: `${Math.max(rows, 3) * 1.7}em` }}
         aria-label={ariaLabel}
         renderStyle={renderStyle}
         renderDecorator={renderDecorator}
         renderAnnotation={renderAnnotation}
+        renderPlaceholder={() => (
+          <span className="portable-text-editor__placeholder">{placeholder}</span>
+        )}
+        onKeyDown={(event) => {
+          if (hasLink && event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            setLinkOpen(true);
+          }
+        }}
       />
     </EditorProvider>
   );
@@ -302,12 +444,18 @@ function serializeValue(value) {
   return hasText ? JSON.stringify(value) : '';
 }
 
-// One record per attached textarea: the React root, its container, the latest
-// value, and the change callback Drupal registers after attaching.
+// One record per attached textarea: the React root, its container, and the
+// change callback Drupal registers after attaching.
 const instances = new WeakMap();
 
 Drupal.editors.portable_text = {
   attach(element, format) {
+    // Drupal can run attach twice for the same element, for instance when a
+    // form is rebuilt over AJAX.
+    if (instances.has(element)) {
+      this.detach(element, format, 'unload');
+    }
+
     const container = document.createElement('div');
     container.className = 'portable-text-editor';
     element.parentNode.insertBefore(container, element.nextSibling);
@@ -332,6 +480,8 @@ Drupal.editors.portable_text = {
           toolbar={format.editorSettings.toolbar}
           initialValue={parseValue(element.value)}
           ariaLabel={label ? label.textContent.trim() : Drupal.t('Rich text editor')}
+          placeholder={element.placeholder || Drupal.t('Start writing…')}
+          rows={Number(element.rows) || 5}
           onValue={(value) => {
             element.value = serializeValue(value);
             if (record.callback) {
