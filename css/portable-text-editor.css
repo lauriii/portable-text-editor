@@ -43,6 +43,9 @@ html.js
 }
 
 .portable-text-editor__toolbar {
+  position: sticky;
+  z-index: 3;
+  top: var(--drupal-displace-offset-top, 0px);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -231,16 +234,14 @@ html.js
 }
 
 .portable-text-editor__table {
+  position: relative;
   margin: 0.75em 0;
-  padding: 8px;
-  border: 1px solid #dedede;
-  border-radius: 3px;
-  background: #fafafa;
 }
 
 .portable-text-editor__table table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .portable-text-editor__table th,
@@ -248,18 +249,33 @@ html.js
   padding: 0;
   border: 1px solid #d4d4d4;
   background: #fff;
+  vertical-align: top;
 }
 
 .portable-text-editor__table th {
-  background: #f0f0f0;
+  background: #f5f5f5;
+}
+
+/* The row and column being worked on, the way a spreadsheet shows them. */
+.portable-text-editor__table .portable-text-editor__cell--in-line {
+  background: #f3f8fc;
+}
+
+.portable-text-editor__table th.portable-text-editor__cell--in-line {
+  background: #e8f1f9;
 }
 
 .portable-text-editor__cell {
+  display: block;
   width: 100%;
-  padding: 5px 7px;
+  padding: 6px 8px;
   border: 0;
   background: transparent;
+  color: inherit;
   font: inherit;
+  line-height: 1.5;
+  overflow: hidden;
+  resize: none;
 }
 
 .portable-text-editor__table th .portable-text-editor__cell {
@@ -271,38 +287,59 @@ html.js
   outline-offset: -2px;
 }
 
+/*
+ * The controls belong to the table being worked on, so they only appear while
+ * it has the focus, and they float rather than pushing the page around. They
+ * sit below the table: above it they would end up behind the editor's own
+ * toolbar whenever a table is the first thing in the field.
+ */
 .portable-text-editor__table-actions {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  inset-inline-start: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 4px 6px;
+  border: 1px solid #dedede;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+.portable-text-editor__table-where {
+  margin-inline-end: 4px;
+  color: #757575;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .portable-text-editor__table-actions button {
   padding: 3px 8px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid transparent;
   border-radius: 3px;
-  background: #fff;
+  background: transparent;
+  color: #3b3b3b;
   cursor: pointer;
   font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
 .portable-text-editor__table-actions button:hover:not(:disabled) {
   background: #ebebeb;
 }
 
+.portable-text-editor__table-actions button[aria-pressed="true"] {
+  background: #dbe9f5;
+  color: #003b73;
+}
+
 .portable-text-editor__table-actions button:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-.portable-text-editor__table-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-inline-end: 4px;
-  font-size: 0.8125rem;
 }
 
 .portable-text-editor__editable mark {

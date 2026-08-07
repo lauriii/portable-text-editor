@@ -268,6 +268,17 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<table><tbody><tr><td>Kept</td></tr></tbody></table>',
       ],
+      'line breaks in a cell survive as markup, escaped first' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => FALSE,
+            'rows' => [["one\ntwo", "<b>x</b>\ny"]],
+          ],
+        ],
+        '<table><tbody><tr><td>one<br>' . "\n" . 'two</td><td>&lt;b&gt;x&lt;/b&gt;<br>' . "\n" . 'y</td></tr></tbody></table>',
+      ],
       'a non-string cell renders empty' => [
         [['_type' => 'table', '_key' => 't1', 'header' => FALSE, 'rows' => [[['x'], 'ok']]]],
         '<table><tbody><tr><td></td><td>ok</td></tr></tbody></table>',

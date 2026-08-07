@@ -623,44 +623,193 @@ function emptyRows(rows, columns) {
 }
 
 /**
+ * Moves the focus to a cell, if the table still has one there.
+ *
+ * @param {HTMLElement} table
+ *   The table's wrapper.
+ * @param {number} row
+ *   The row to focus, counting from zero.
+ * @param {number} column
+ *   The column to focus, counting from zero.
+ */
+function focusCell(table, row, column) {
+  const cell = table.querySelector(`[data-row="${row}"][data-column="${column}"]`);
+  if (cell) {
+    cell.focus();
+    cell.setSelectionRange(cell.value.length, cell.value.length);
+  }
+}
+
+/**
+ * A table cell, which grows to fit what is written in it.
+ */
+function TableCell({ row, column, value, header, onChange, onFocus, onKeyDown }) {
+  const field = useRef(null);
+
+  useEffect(() => {
+    // A textarea does not size itself, and a one line cell that scrolls its
+    // own text is the worst part of a table editor.
+    const element = field.current;
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={field}
+      rows={1}
+      data-row={row}
+      data-column={column}
+      className="portable-text-editor__cell"
+      aria-label={
+        header
+          ? Drupal.t('Column @column heading', { '@column': column + 1 })
+          : Drupal.t('Row @row, column @column', { '@row': row + 1, '@column': column + 1 })
+      }
+      value={value}
+      onChange={onChange}
+      onFocus={onFocus}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
+/**
  * The editing grid for a table block.
  *
  * The block is a block object, so the editor treats it as one opaque thing and
- * this owns everything inside it. Cells hold plain text; formatting a cell
+ * this owns everything inside it: what a cell holds, how the caret moves
+ * between cells, and the controls, which only appear while the table is being
+ * worked on. Cells hold plain text with line breaks; formatting inside a cell
  * would need an editor per cell.
  */
 function TableBlock({ value, path }) {
   const editor = useEditor();
-  // Which cell was last used, so that removing a row or column has a target.
+  const wrapper = useRef(null);
+  // The cell last used, which is what the controls act on, and whether the
+  // table has the focus at all, which is what shows them.
   const [at, setAt] = useState({ row: 0, column: 0 });
+  const [active, setActive] = useState(false);
+
   const rows = Array.isArray(value.rows) ? value.rows : [];
   const columns = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
   const header = value.header !== false;
 
   const update = (props) => editor.send({ type: 'block.set', at: path, props });
   const setRows = (next) => update({ rows: next });
+  const blank = (length) => Array.from({ length }, () => '');
+
+  // Every control works from the cell that was last used, the way a word
+  // processor does, rather than only appending at the far edge.
+  const insertRow = (offset) => {
+    const index = at.row + offset;
+    setRows([...rows.slice(0, index), blank(columns), ...rows.slice(index)]);
+    requestAnimationFrame(() => focusCell(wrapper.current, index, at.column));
+  };
+  const insertColumn = (offset) => {
+    const index = at.column + offset;
+    setRows(rows.map((row) => [...row.slice(0, index), '', ...row.slice(index)]));
+    requestAnimationFrame(() => focusCell(wrapper.current, at.row, index));
+  };
+  const removeRow = () => {
+    setRows(rows.filter((row, index) => index !== at.row));
+    requestAnimationFrame(() => focusCell(wrapper.current, Math.max(0, at.row - 1), at.column));
+  };
+  const removeColumn = () => {
+    setRows(rows.map((row) => row.filter((cell, index) => index !== at.column)));
+    requestAnimationFrame(() =>
+      focusCell(wrapper.current, at.row, Math.max(0, at.column - 1)),
+    );
+  };
+
+  /**
+   * Keeps the caret moving the way it does in a spreadsheet.
+   */
+  const onCellKeyDown = (event, row, column) => {
+    const element = event.target;
+    const atStart = element.selectionStart === 0 && element.selectionEnd === 0;
+    const atEnd =
+      element.selectionStart === element.value.length &&
+      element.selectionEnd === element.value.length;
+
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const forward = !event.shiftKey;
+      const flat = row * columns + column + (forward ? 1 : -1);
+      if (flat < 0) {
+        return;
+      }
+      if (flat >= rows.length * columns) {
+        // Tab past the last cell grows the table, which is how every editor
+        // worth using behaves.
+        setRows([...rows, blank(columns)]);
+        requestAnimationFrame(() => focusCell(wrapper.current, rows.length, 0));
+        return;
+      }
+      focusCell(wrapper.current, Math.floor(flat / columns), flat % columns);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      editor.send({ type: 'focus' });
+      return;
+    }
+    // Up and down leave the cell only from its first or last line, so that a
+    // cell holding several lines can still be moved around in.
+    if (event.key === 'ArrowUp' && !element.value.slice(0, element.selectionStart).includes('\n')) {
+      event.preventDefault();
+      focusCell(wrapper.current, row - 1, column);
+      return;
+    }
+    if (event.key === 'ArrowDown' && !element.value.slice(element.selectionEnd).includes('\n')) {
+      event.preventDefault();
+      focusCell(wrapper.current, row + 1, column);
+      return;
+    }
+    if (event.key === 'ArrowLeft' && atStart) {
+      event.preventDefault();
+      focusCell(wrapper.current, row, column - 1);
+    }
+    if (event.key === 'ArrowRight' && atEnd) {
+      event.preventDefault();
+      focusCell(wrapper.current, row, column + 1);
+    }
+  };
 
   return (
-    <div className="portable-text-editor__table" contentEditable={false}>
+    <div
+      ref={wrapper}
+      className="portable-text-editor__table"
+      contentEditable={false}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setActive(false);
+        }
+      }}
+    >
       <table>
         <tbody>
           {rows.map((row, rowIndex) => (
             // eslint-disable-next-line react/no-array-index-key
             <tr key={rowIndex}>
               {Array.from({ length: columns }, (ignored, columnIndex) => {
-                const Cell = header && rowIndex === 0 ? 'th' : 'td';
+                const isHeading = header && rowIndex === 0;
+                const Wrapper = isHeading ? 'th' : 'td';
                 return (
-                  // eslint-disable-next-line react/no-array-index-key
-                  <Cell key={columnIndex}>
-                    <input
-                      type="text"
-                      className="portable-text-editor__cell"
-                      aria-label={Drupal.t('Row @row, column @column', {
-                        '@row': rowIndex + 1,
-                        '@column': columnIndex + 1,
-                      })}
+                  <Wrapper
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={columnIndex}
+                    className={
+                      active && (at.row === rowIndex || at.column === columnIndex)
+                        ? 'portable-text-editor__cell--in-line'
+                        : undefined
+                    }
+                  >
+                    <TableCell
+                      row={rowIndex}
+                      column={columnIndex}
+                      header={isHeading}
                       value={row[columnIndex] || ''}
-                      onFocus={() => setAt({ row: rowIndex, column: columnIndex })}
                       onChange={(changed) =>
                         setRows(
                           rows.map((current, index) =>
@@ -670,49 +819,62 @@ function TableBlock({ value, path }) {
                           ),
                         )
                       }
+                      onFocus={() => {
+                        // The focused cell is what the controls act on, so it
+                        // is read from the focus rather than from the last key
+                        // pressed, which would always be one cell behind.
+                        setAt({ row: rowIndex, column: columnIndex });
+                        setActive(true);
+                      }}
+                      onKeyDown={(event) => onCellKeyDown(event, rowIndex, columnIndex)}
                     />
-                  </Cell>
+                  </Wrapper>
                 );
               })}
             </tr>
           ))}
         </tbody>
       </table>
-      <div className="portable-text-editor__table-actions">
-        <label className="portable-text-editor__table-header">
-          <input
-            type="checkbox"
-            checked={header}
-            onChange={(changed) => update({ header: changed.target.checked })}
-          />
-          {Drupal.t('Header row')}
-        </label>
-        <button type="button" onClick={() => setRows([...rows, emptyRows(1, columns)[0]])}>
-          {Drupal.t('Add row')}
-        </button>
-        <button type="button" onClick={() => setRows(rows.map((row) => [...row, '']))}>
-          {Drupal.t('Add column')}
-        </button>
-        <button
-          type="button"
-          disabled={rows.length < 2}
-          onClick={() => setRows(rows.filter((row, index) => index !== at.row))}
-        >
-          {Drupal.t('Remove row')}
-        </button>
-        <button
-          type="button"
-          disabled={columns < 2}
-          onClick={() =>
-            setRows(rows.map((row) => row.filter((cell, index) => index !== at.column)))
-          }
-        >
-          {Drupal.t('Remove column')}
-        </button>
-        <button type="button" onClick={() => editor.send({ type: 'delete.block', at: path })}>
-          {Drupal.t('Remove table')}
-        </button>
-      </div>
+      {active ? (
+        <div className="portable-text-editor__table-actions" role="toolbar" aria-label={Drupal.t('Table')}>
+          <span className="portable-text-editor__table-where">
+            {Drupal.t('Row @row, column @column', {
+              '@row': at.row + 1,
+              '@column': at.column + 1,
+            })}
+          </span>
+          <button type="button" onClick={() => insertRow(0)}>
+            {Drupal.t('Row above')}
+          </button>
+          <button type="button" onClick={() => insertRow(1)}>
+            {Drupal.t('Row below')}
+          </button>
+          <button type="button" onClick={() => insertColumn(0)}>
+            {Drupal.t('Column left')}
+          </button>
+          <button type="button" onClick={() => insertColumn(1)}>
+            {Drupal.t('Column right')}
+          </button>
+          <span className="portable-text-editor__divider" />
+          <button type="button" disabled={rows.length < 2} onClick={removeRow}>
+            {Drupal.t('Delete row')}
+          </button>
+          <button type="button" disabled={columns < 2} onClick={removeColumn}>
+            {Drupal.t('Delete column')}
+          </button>
+          <span className="portable-text-editor__divider" />
+          <button
+            type="button"
+            aria-pressed={header}
+            onClick={() => update({ header: !header })}
+          >
+            {Drupal.t('Header row')}
+          </button>
+          <button type="button" onClick={() => editor.send({ type: 'delete.block', at: path })}>
+            {Drupal.t('Delete table')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

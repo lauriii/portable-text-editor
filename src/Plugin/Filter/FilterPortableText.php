@@ -189,7 +189,10 @@ class FilterPortableText extends FilterBase {
       $tag = $header && $rendered === [] ? 'th' : 'td';
       $cells = '';
       foreach ($row as $cell) {
-        $cells .= '<' . $tag . '>' . (is_string($cell) ? Html::escape($cell) : '') . '</' . $tag . '>';
+        // Cells may hold several lines, which only survive as markup. Escaping
+        // first means the <br> tags are the only ones that can be there.
+        $text = is_string($cell) ? nl2br(Html::escape($cell), FALSE) : '';
+        $cells .= '<' . $tag . '>' . $text . '</' . $tag . '>';
       }
       $rendered[] = '<tr>' . $cells . '</tr>';
     }

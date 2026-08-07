@@ -86,11 +86,24 @@ dividers appear between the groups.
 - **Keyboard navigation.** The toolbar is a single tab stop, with arrow keys,
   Home and End moving between buttons, so Tab reaches the writing area without
   passing through every button.
-- **Tables.** A table is a Portable Text block object holding rows of plain
-  text, and the writing area edits it as a grid: add or remove a row or a
-  column, turn the header row on or off, or remove the table. Removing acts on
-  the row or column of the cell last used. Cells hold plain text, because
-  formatting inside one would need an editor per cell.
+- **The toolbar follows a long field**, sticking below Drupal's own toolbar
+  rather than scrolling out of reach.
+- **Tables.** A table is a Portable Text block object holding rows of text,
+  edited as a grid:
+  - Cells grow as they are written in and hold several lines. A line break is
+    rendered as `<br>`, after the text has been escaped.
+  - Tab and Shift+Tab move between cells, and Tab past the last cell adds a
+    row. Up and down move between rows, but only from a cell's first or last
+    line, so a cell holding several lines can still be moved around in. Left
+    and right move between cells from the ends of the text. Escape leaves the
+    table for the writing area.
+  - Controls float below the table and only while it has the focus, so they
+    neither clutter the field nor shift the page. They insert a row above or
+    below and a column left or right of the cell in use, delete that row or
+    column, turn the header row on or off, or delete the table, and they name
+    the cell they will act on. The row and column in use are tinted.
+  - Cells hold plain text: formatting inside one would need an editor per
+    cell.
 - **Pasting.** Pasted HTML is converted to Portable Text and is limited to what
   the schema allows: headings, block quotes, lists, links and the eight inline
   decorators survive, and anything else, such as an `h1`, a table or an image,
