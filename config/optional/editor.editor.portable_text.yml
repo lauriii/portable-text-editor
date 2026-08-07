@@ -9,15 +9,18 @@ format: portable_text
 editor: portable_text
 settings:
   toolbar:
+    - undo
+    - redo
+    - styles
     - bold
     - italic
     - underline
     - strike_through
     - code
-    - h2
-    - h3
-    - h4
-    - blockquote
+    - superscript
+    - subscript
+    - highlight
+    - clear_format
     - bulleted_list
     - numbered_list
     - link

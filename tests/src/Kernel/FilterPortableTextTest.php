@@ -180,6 +180,19 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<p><u>u</u><code>c</code><del>s</del></p>',
       ],
+      'superscript, subscript and highlight decorators' => [
+        [
+          self::block([
+            self::span('E=mc'),
+            self::span('2', ['superscript']),
+            self::span(' H'),
+            self::span('2', ['subscript']),
+            self::span('O '),
+            self::span('note', ['highlight']),
+          ]),
+        ],
+        '<p>E=mc<sup>2</sup> H<sub>2</sub>O <mark>note</mark></p>',
+      ],
       'blockquote' => [
         [self::block([self::span('Quoted')], ['style' => 'blockquote'])],
         '<blockquote>Quoted</blockquote>',

@@ -51,6 +51,9 @@ class FilterPortableText extends FilterBase {
     'underline' => 'u',
     'code' => 'code',
     'strike-through' => 'del',
+    'superscript' => 'sup',
+    'subscript' => 'sub',
+    'highlight' => 'mark',
   ];
 
   /**

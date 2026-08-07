@@ -16,15 +16,18 @@ editor.settings.portable_text:
           Choice:
             # @see \Drupal\portable_text_editor\Plugin\Editor\PortableText::toolbarButtons()
             choices:
+              - undo
+              - redo
+              - styles
               - bold
               - italic
               - underline
               - strike_through
               - code
-              - h2
-              - h3
-              - h4
-              - blockquote
+              - superscript
+              - subscript
+              - highlight
+              - clear_format
               - bulleted_list
               - numbered_list
               - link

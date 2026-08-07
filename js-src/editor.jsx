@@ -6,7 +6,7 @@
  * js/portable-text-editor.js.
  */
 
-import { Fragment, StrictMode, useEffect, useId, useReducer, useState } from 'react';
+import { Fragment, StrictMode, useEffect, useId, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   EditorProvider,
@@ -17,6 +17,7 @@ import {
 } from '@portabletext/editor';
 import { EventListenerPlugin } from '@portabletext/editor/plugins';
 import {
+  getActiveStyle,
   getFocusSpan,
   getFocusTextBlock,
   isActiveAnnotation,
@@ -32,6 +33,9 @@ const schemaDefinition = defineSchema({
     { name: 'underline' },
     { name: 'strike-through' },
     { name: 'code' },
+    { name: 'superscript' },
+    { name: 'subscript' },
+    { name: 'highlight' },
   ],
   styles: [
     { name: 'normal' },
@@ -51,8 +55,9 @@ const MOD = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform || navigat
   ? '⌘'
   : 'Ctrl+';
 
-// Icons are drawn rather than lettered, so that they do not need translating
-// and stay legible at the size a toolbar button gives them.
+// Formatting controls show a letter or symbol, the way word processors do,
+// and structural ones show a drawn icon. Both are decorative: the accessible
+// name and the tooltip carry the wording.
 const stroke = {
   fill: 'none',
   stroke: 'currentColor',
@@ -69,50 +74,39 @@ function Icon({ children }) {
   );
 }
 
-const ICONS = {
-  bold: (
+/**
+ * The face of each button: a glyph class plus its text, or a drawn icon.
+ */
+const FACES = {
+  bold: <span className="portable-text-editor__glyph--bold">B</span>,
+  italic: <span className="portable-text-editor__glyph--italic">I</span>,
+  underline: <span className="portable-text-editor__glyph--underline">U</span>,
+  strike_through: <span className="portable-text-editor__glyph--strike">S</span>,
+  code: <span className="portable-text-editor__glyph--code">&lt;/&gt;</span>,
+  superscript: (
+    <span>
+      x<sup>2</sup>
+    </span>
+  ),
+  subscript: (
+    <span>
+      x<sub>2</sub>
+    </span>
+  ),
+  highlight: <span className="portable-text-editor__glyph--highlight">A</span>,
+  clear_format: (
+    <span>
+      T<span className="portable-text-editor__glyph--times">×</span>
+    </span>
+  ),
+  undo: (
     <Icon>
-      <path d="M4.5 2.5h4a2.75 2.75 0 0 1 0 5.5h-4zM4.5 8h4.75a2.75 2.75 0 0 1 0 5.5H4.5z" {...stroke} />
+      <path d="M3 8h6.5a3.5 3.5 0 1 1 0 7H6M3 8l3-3M3 8l3 3" {...stroke} />
     </Icon>
   ),
-  italic: (
+  redo: (
     <Icon>
-      <path d="M10.5 2.75h-3m1 0-3 10.5m0 0h3m-3 0h-3" {...stroke} />
-    </Icon>
-  ),
-  underline: (
-    <Icon>
-      <path d="M4 2.5v5a4 4 0 0 0 8 0v-5M3.5 14h9" {...stroke} />
-    </Icon>
-  ),
-  strike_through: (
-    <Icon>
-      <path d="M2.5 8h11M11.5 4.2A3.5 3.5 0 0 0 8 2.5C5.8 2.5 4.5 3.6 4.5 5.1c0 1 .6 1.9 2 2.4M4.5 11.5A3.6 3.6 0 0 0 8 13.5c2.2 0 3.5-1 3.5-2.6 0-.8-.3-1.4-1-1.9" {...stroke} />
-    </Icon>
-  ),
-  code: (
-    <Icon>
-      <path d="M5.75 3.75 1.5 8l4.25 4.25M10.25 3.75 14.5 8l-4.25 4.25" {...stroke} />
-    </Icon>
-  ),
-  h2: (
-    <Icon>
-      <path d="M2 3v10M2 8h5M7 3v10M10.5 6.2a2 2 0 0 1 3.4 1.4c0 1.6-3.4 2.7-3.4 5.4h3.5" {...stroke} />
-    </Icon>
-  ),
-  h3: (
-    <Icon>
-      <path d="M2 3v10M2 8h5M7 3v10M10.5 5.8a2 2 0 1 1 1.7 3.1 2 2 0 1 1-1.7 3.2" {...stroke} />
-    </Icon>
-  ),
-  h4: (
-    <Icon>
-      <path d="M2 3v10M2 8h5M7 3v10M13.4 5.5v7.5M13.4 5.5 10.2 10.7h4" {...stroke} />
-    </Icon>
-  ),
-  blockquote: (
-    <Icon>
-      <path d="M2.5 12.5V9c0-2.8 1.4-4.6 3.5-5.5M2.5 9h3v3.5h-3zM9.5 12.5V9c0-2.8 1.4-4.6 3.5-5.5M9.5 9h3v3.5h-3z" {...stroke} />
+      <path d="M13 8H6.5a3.5 3.5 0 1 0 0 7H10M13 8l-3-3M13 8l-3 3" {...stroke} />
     </Icon>
   ),
   bulleted_list: (
@@ -126,13 +120,13 @@ const ICONS = {
   numbered_list: (
     <Icon>
       <path d="M6 4h8.5M6 8h8.5M6 12h8.5" {...stroke} />
-      <text x="0" y="5.4" fontSize="5" fill="currentColor">
+      <text x="0" y="5.6" fontSize="5.5" fill="currentColor">
         1
       </text>
-      <text x="0" y="9.4" fontSize="5" fill="currentColor">
+      <text x="0" y="9.6" fontSize="5.5" fill="currentColor">
         2
       </text>
-      <text x="0" y="13.4" fontSize="5" fill="currentColor">
+      <text x="0" y="13.6" fontSize="5.5" fill="currentColor">
         3
       </text>
     </Icon>
@@ -144,14 +138,38 @@ const ICONS = {
   ),
 };
 
+// The inline formatting "Remove formatting" strips.
+const DECORATORS = [
+  'strong',
+  'em',
+  'underline',
+  'strike-through',
+  'code',
+  'superscript',
+  'subscript',
+  'highlight',
+];
+
 /**
- * Toolbar buttons, keyed by the IDs the Editor plugin stores in config.
+ * Toolbar controls, keyed by the IDs the Editor plugin stores in config.
  *
- * `selector` reports whether the button is currently applied, `event` is the
- * editor event a click sends, `shortcut` is shown in the button's tooltip, and
- * `group` draws a divider wherever it changes.
+ * `selector` reports whether the control is currently applied, `event` is the
+ * editor event a click sends, `shortcut` is shown in the tooltip, and `group`
+ * draws a divider wherever it changes.
  */
 const BUTTONS = {
+  undo: {
+    label: Drupal.t('Undo'),
+    shortcut: `${MOD}Z`,
+    group: 'history',
+    event: { type: 'history.undo' },
+  },
+  redo: {
+    label: Drupal.t('Redo'),
+    shortcut: `${MOD}\u21e7Z`,
+    group: 'history',
+    event: { type: 'history.redo' },
+  },
   bold: {
     label: Drupal.t('Bold'),
     shortcut: `${MOD}B`,
@@ -185,29 +203,27 @@ const BUTTONS = {
     selector: isActiveDecorator('code'),
     event: { type: 'decorator.toggle', decorator: 'code' },
   },
-  h2: {
-    label: Drupal.t('Heading 2'),
-    group: 'block',
-    selector: isActiveStyle('h2'),
-    event: { type: 'style.toggle', style: 'h2' },
+  superscript: {
+    label: Drupal.t('Superscript'),
+    group: 'text',
+    selector: isActiveDecorator('superscript'),
+    event: { type: 'decorator.toggle', decorator: 'superscript' },
   },
-  h3: {
-    label: Drupal.t('Heading 3'),
-    group: 'block',
-    selector: isActiveStyle('h3'),
-    event: { type: 'style.toggle', style: 'h3' },
+  subscript: {
+    label: Drupal.t('Subscript'),
+    group: 'text',
+    selector: isActiveDecorator('subscript'),
+    event: { type: 'decorator.toggle', decorator: 'subscript' },
   },
-  h4: {
-    label: Drupal.t('Heading 4'),
-    group: 'block',
-    selector: isActiveStyle('h4'),
-    event: { type: 'style.toggle', style: 'h4' },
+  highlight: {
+    label: Drupal.t('Highlight'),
+    group: 'text',
+    selector: isActiveDecorator('highlight'),
+    event: { type: 'decorator.toggle', decorator: 'highlight' },
   },
-  blockquote: {
-    label: Drupal.t('Block quote'),
-    group: 'block',
-    selector: isActiveStyle('blockquote'),
-    event: { type: 'style.toggle', style: 'blockquote' },
+  clear_format: {
+    label: Drupal.t('Remove formatting'),
+    group: 'text',
   },
   bulleted_list: {
     label: Drupal.t('Bulleted list'),
@@ -226,7 +242,20 @@ const BUTTONS = {
     shortcut: `${MOD}K`,
     group: 'link',
   },
+  styles: {
+    label: Drupal.t('Block style'),
+    group: 'style',
+  },
 };
+
+// What the block style menu offers, in the order it lists them.
+const STYLE_OPTIONS = [
+  ['normal', Drupal.t('Paragraph')],
+  ['h2', Drupal.t('Heading 2')],
+  ['h3', Drupal.t('Heading 3')],
+  ['h4', Drupal.t('Heading 4')],
+  ['blockquote', Drupal.t('Block quote')],
+];
 
 /**
  * Reads an editor selector, re-rendering whenever its answer can change.
@@ -282,7 +311,9 @@ function onToolbarKeyDown(event) {
   if (offset === undefined) {
     return;
   }
-  const buttons = Array.from(event.currentTarget.querySelectorAll('button'));
+  // Left and right always move along the toolbar, including out of the block
+  // style menu; up and down are left alone so they still change its value.
+  const buttons = Array.from(event.currentTarget.querySelectorAll('button, select'));
   const from = buttons.indexOf(document.activeElement);
   if (from === -1) {
     return;
@@ -297,8 +328,8 @@ function onToolbarKeyDown(event) {
 
 function ToolbarButton({ id, index }) {
   const editor = useEditor();
-  const active = useEditorState(editor, BUTTONS[id].selector);
-  const { label, shortcut } = BUTTONS[id];
+  const { label, shortcut, selector, event } = BUTTONS[id];
+  const active = useEditorState(editor, selector || (() => false));
 
   return (
     <button
@@ -311,12 +342,59 @@ function ToolbarButton({ id, index }) {
       // Keep the selection in the editable while the button is used.
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
-        editor.send(BUTTONS[id].event);
+        if (event) {
+          editor.send(event);
+        }
+        else {
+          // "Remove formatting" clears the link and the decorators that are
+          // actually applied. Skipping the rest keeps the undo history short,
+          // because each removal is a step of its own.
+          const snapshot = editor.getSnapshot();
+          DECORATORS.filter((decorator) => isActiveDecorator(decorator)(snapshot)).forEach(
+            (decorator) => editor.send({ type: 'decorator.remove', decorator }),
+          );
+          editor.send({ type: 'annotation.remove', annotation: { name: 'link' } });
+        }
         editor.send({ type: 'focus' });
       }}
     >
-      {ICONS[id]}
+      {FACES[id]}
     </button>
+  );
+}
+
+/**
+ * The block style menu, which also shows which style the caret is in.
+ */
+function StyleSelect({ index }) {
+  const editor = useEditor();
+  const style = useEditorState(editor, getActiveStyle);
+  // There is no active style while the editor is blurred, which is exactly
+  // what happens when the menu itself is being used, so the last one the caret
+  // was in is kept rather than falling back to "Paragraph".
+  const remembered = useRef('normal');
+  if (style) {
+    remembered.current = style;
+  }
+  const known = STYLE_OPTIONS.some(([name]) => name === remembered.current);
+
+  return (
+    <select
+      className="portable-text-editor__select"
+      aria-label={Drupal.t('Block style')}
+      title={Drupal.t('Block style')}
+      tabIndex={index === 0 ? 0 : -1}
+      value={known ? remembered.current : 'normal'}
+      onChange={(changed) => {
+        sendWhenFocused(editor, { type: 'style.add', style: changed.target.value });
+      }}
+    >
+      {STYLE_OPTIONS.map(([name, optionLabel]) => (
+        <option key={name} value={name}>
+          {optionLabel}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -337,7 +415,7 @@ function LinkButton({ index, open, onOpen }) {
       onMouseDown={(e) => e.preventDefault()}
       onClick={onOpen}
     >
-      {ICONS.link}
+      {FACES.link}
     </button>
   );
 }
@@ -469,6 +547,9 @@ const DECORATOR_TAGS = {
   underline: 'u',
   'strike-through': 's',
   code: 'code',
+  superscript: 'sup',
+  subscript: 'sub',
+  highlight: 'mark',
 };
 
 function renderStyle(props) {
@@ -520,11 +601,11 @@ function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }
             {index > 0 && BUTTONS[id].group !== BUTTONS[buttons[index - 1]].group ? (
               <span className="portable-text-editor__divider" />
             ) : null}
+            {id === 'styles' ? <StyleSelect index={index} /> : null}
             {id === 'link' ? (
               <LinkButton index={index} open={linkOpen} onOpen={() => setLinkOpen(true)} />
-            ) : (
-              <ToolbarButton id={id} index={index} />
-            )}
+            ) : null}
+            {id !== 'styles' && id !== 'link' ? <ToolbarButton id={id} index={index} /> : null}
           </Fragment>
         ))}
       </div>

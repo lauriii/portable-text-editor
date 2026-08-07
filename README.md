@@ -47,15 +47,22 @@ The practical consequences:
 
 ## Editing experience
 
-The toolbar offers, in this order: bold, italic, underline, strike-through,
-code, heading 2, heading 3, heading 4, block quote, bulleted list, numbered
-list and link. Each button can be turned off per text format in the editor
-settings form, and dividers appear between the groups.
+The toolbar offers, in this order: undo, redo, a block style menu, bold,
+italic, underline, strike-through, code, superscript, subscript, highlight,
+remove formatting, bulleted list, numbered list and link. Each control can be
+turned off per text format in the editor settings form, and dividers appear
+between the groups.
 
-Buttons carry icons rather than words, so nothing in the toolbar needs
-translating; the name and shortcut are in each button's tooltip and accessible
-name.
-
+- **The block style menu shows the style the caret is in**, and switches
+  between paragraph, heading 2, heading 3, heading 4 and block quote. It keeps
+  showing that style while the menu itself has the focus, rather than falling
+  back to "Paragraph" the moment the writing area is blurred.
+- Formatting controls show a letter or symbol the way a word processor does
+  (**B**, *I*, U, S, `</>`, x², x₂, A, T×) and structural ones show a drawn
+  icon, so nothing in the toolbar needs translating. The name and shortcut are
+  in each control's tooltip and accessible name.
+- **Remove formatting** clears the link and only the decorators actually
+  applied, so it does not fill the undo history with no-ops.
 - **Keyboard shortcuts.** Ctrl/Cmd+B, Ctrl/Cmd+I and Ctrl/Cmd+U come from the
   Portable Text editor itself, as do Tab and Shift+Tab for list indenting.
   Ctrl/Cmd+K opens the link field. Button tooltips show the shortcut using the
@@ -74,14 +81,10 @@ name.
   Home and End moving between buttons, so Tab reaches the writing area without
   passing through every button.
 - **Pasting.** Pasted HTML is converted to Portable Text and is limited to what
-  the schema allows: headings, block quotes, lists, links and the five inline
+  the schema allows: headings, block quotes, lists, links and the eight inline
   decorators survive, and anything else, such as an `h1`, a table or an image,
   is flattened to plain paragraphs. Nothing the toolbar cannot produce can get
   into the stored value this way.
-
-Not included: markdown-style input rules such as typing `## ` for a heading,
-undo and redo buttons (Ctrl/Cmd+Z works from the keyboard), images and other
-block objects, and tables.
 - **Empty state.** An empty editor shows the textarea's own placeholder, or
   "Start writing…" when it has none.
 - **No flash of raw JSON.** Until the editor attaches, the textarea would show
@@ -89,6 +92,10 @@ block objects, and tables.
   space. If the editor never arrives, for instance because its JavaScript
   failed to load, the textarea is handed back after three seconds rather than
   leaving an invisible field behind.
+
+Not included: markdown-style input rules such as typing `## ` for a heading,
+images and other block objects, tables, and code blocks (`pre`), which would
+need whitespace preservation that a Portable Text text block does not offer.
 
 ## Requirements
 
