@@ -1,0 +1,34 @@
+# Schema for the configuration files of the Portable Text editor module.
+
+editor.settings.portable_text:
+  type: mapping
+  label: 'Portable Text editor settings'
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    toolbar:
+      type: sequence
+      label: 'Toolbar buttons'
+      sequence:
+        type: string
+        label: 'Toolbar button'
+        constraints:
+          Choice:
+            # @see \Drupal\portable_text_editor\Plugin\Editor\PortableText::toolbarButtons()
+            choices:
+              - bold
+              - italic
+              - h2
+              - h3
+              - bulleted_list
+              - numbered_list
+              - link
+
+filter_settings.filter_portable_text:
+  type: mapping
+  label: 'Render Portable Text'
+  # The filter has nothing to configure: what it renders is decided by the
+  # Portable Text in the field, not by settings.
+  mapping: {}
+  constraints:
+    FullyValidatable: ~

@@ -1,0 +1,197 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Drupal\portable_text_editor\Plugin\Filter;
+
+use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\filter\Attribute\Filter;
+use Drupal\filter\FilterProcessResult;
+use Drupal\filter\Plugin\FilterBase;
+use Drupal\filter\Plugin\FilterInterface;
+
+/**
+ * Renders Portable Text JSON as HTML.
+ *
+ * Everything this filter emits is generated here from decoded JSON values, and
+ * every value coming from the stored text is escaped. Nothing in the input is
+ * ever treated as markup, so Portable Text content cannot inject HTML.
+ */
+#[Filter(
+  id: 'filter_portable_text',
+  title: new TranslatableMarkup('Render Portable Text'),
+  description: new TranslatableMarkup('Renders stored Portable Text JSON as HTML. Text formats using this filter store JSON, not HTML, so HTML-oriented filters have nothing to act on.'),
+  type: FilterInterface::TYPE_MARKUP_LANGUAGE,
+  weight: 0,
+)]
+class FilterPortableText extends FilterBase {
+
+  /**
+   * Block styles that render as their own element, keyed by style name.
+   */
+  protected const STYLE_TAGS = [
+    'h1' => 'h1',
+    'h2' => 'h2',
+    'h3' => 'h3',
+    'h4' => 'h4',
+    'h5' => 'h5',
+    'h6' => 'h6',
+    'blockquote' => 'blockquote',
+    'normal' => 'p',
+  ];
+
+  /**
+   * Inline decorators that render as their own element, keyed by mark name.
+   */
+  protected const DECORATOR_TAGS = [
+    'strong' => 'strong',
+    'em' => 'em',
+    'underline' => 'u',
+    'code' => 'code',
+    'strike-through' => 'del',
+  ];
+
+  /**
+   * List item types, keyed by Portable Text name, valued by wrapper element.
+   */
+  protected const LIST_TAGS = [
+    'bullet' => 'ul',
+    'number' => 'ol',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
+  public function process($text, $langcode): FilterProcessResult {
+    return new FilterProcessResult($this->render((string) $text));
+  }
+
+  /**
+   * Renders Portable Text JSON as HTML, failing safe on anything unexpected.
+   *
+   * @param string $text
+   *   The stored field value.
+   *
+   * @return string
+   *   Rendered, fully escaped HTML. Empty when the value cannot be understood
+   *   as Portable Text, so that raw JSON is never shown to a visitor.
+   */
+  protected function render(string $text): string {
+    $text = trim($text);
+    if ($text === '') {
+      return '';
+    }
+
+    $decoded = json_decode($text, TRUE);
+    if ($decoded === NULL && json_last_error() !== JSON_ERROR_NONE) {
+      // Not JSON at all. This happens when a field was authored in another
+      // text format and then switched over, so keep the text rather than
+      // discarding it. Escaping makes any markup in it inert.
+      return '<p>' . Html::escape($text) . '</p>';
+    }
+    if (!is_array($decoded) || !array_is_list($decoded)) {
+      // Valid JSON, but not an array of Portable Text blocks.
+      return '';
+    }
+
+    $output = '';
+    $open_list = NULL;
+    foreach ($decoded as $block) {
+      if (!is_array($block) || ($block['_type'] ?? NULL) !== 'block') {
+        // Block objects (images, embeds and so on) are not supported by this
+        // editor, so they are skipped rather than guessed at.
+        continue;
+      }
+
+      $list_item = is_string($block['listItem'] ?? NULL) ? $block['listItem'] : NULL;
+      $list_tag = self::LIST_TAGS[$list_item] ?? NULL;
+      // ponytail: lists render flat. Portable Text "level" is ignored because
+      // the toolbar cannot produce nested lists; add a stack of open tags here
+      // if indenting is ever added.
+      if ($list_tag !== $open_list) {
+        $output .= $open_list === NULL ? '' : '</' . $open_list . '>';
+        $output .= $list_tag === NULL ? '' : '<' . $list_tag . '>';
+        $open_list = $list_tag;
+      }
+
+      $children = $this->renderChildren($block);
+      if ($list_tag !== NULL) {
+        $output .= '<li>' . $children . '</li>';
+        continue;
+      }
+
+      $style = is_string($block['style'] ?? NULL) ? $block['style'] : 'normal';
+      $tag = self::STYLE_TAGS[$style] ?? 'p';
+      $output .= '<' . $tag . '>' . $children . '</' . $tag . '>';
+    }
+    if ($open_list !== NULL) {
+      $output .= '</' . $open_list . '>';
+    }
+
+    return $output;
+  }
+
+  /**
+   * Renders the spans of a single Portable Text block.
+   *
+   * @param array $block
+   *   A decoded Portable Text block.
+   *
+   * @return string
+   *   The escaped inline HTML of the block.
+   */
+  protected function renderChildren(array $block): string {
+    $children = $block['children'] ?? [];
+    if (!is_array($children)) {
+      return '';
+    }
+
+    // Mark definitions carry the data of annotations such as links. They are
+    // referenced from a span's marks by their "_key".
+    $mark_defs = [];
+    foreach (is_array($block['markDefs'] ?? NULL) ? $block['markDefs'] : [] as $mark_def) {
+      if (is_array($mark_def) && isset($mark_def['_key']) && is_string($mark_def['_key'])) {
+        $mark_defs[$mark_def['_key']] = $mark_def;
+      }
+    }
+
+    $output = '';
+    foreach ($children as $child) {
+      if (!is_array($child) || ($child['_type'] ?? NULL) !== 'span' || !is_string($child['text'] ?? NULL)) {
+        continue;
+      }
+
+      $open = '';
+      $close = '';
+      foreach (is_array($child['marks'] ?? NULL) ? $child['marks'] : [] as $mark) {
+        if (!is_string($mark)) {
+          continue;
+        }
+        if (isset(self::DECORATOR_TAGS[$mark])) {
+          $open .= '<' . self::DECORATOR_TAGS[$mark] . '>';
+          $close = '</' . self::DECORATOR_TAGS[$mark] . '>' . $close;
+        }
+        elseif (($mark_defs[$mark]['_type'] ?? NULL) === 'link' && is_string($mark_defs[$mark]['href'] ?? NULL)) {
+          // filterBadProtocol() strips javascript: and friends and escapes the
+          // result, so the attribute cannot break out of its quotes.
+          $open .= '<a href="' . UrlHelper::filterBadProtocol($mark_defs[$mark]['href']) . '">';
+          $close = '</a>' . $close;
+        }
+      }
+
+      $output .= $open . Html::escape($child['text']) . $close;
+    }
+
+    return $output;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function tips($long = FALSE) {
+    return $this->t('Content is stored as Portable Text and rendered as HTML on output.');
+  }
+
+}

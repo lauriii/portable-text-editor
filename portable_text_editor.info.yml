@@ -1,0 +1,8 @@
+name: 'Portable Text editor'
+type: module
+description: 'Provides the Portable Text editor as a Drupal text editor, storing Portable Text JSON and rendering it to HTML on output.'
+package: 'Text editors'
+core_version_requirement: ^11 || ^12
+dependencies:
+  - drupal:editor
+  - drupal:filter

@@ -1,0 +1,11 @@
+editor:
+  version: VERSION
+  js:
+    js/portable-text-editor.js: { preprocess: false, minified: true }
+  css:
+    theme:
+      css/portable-text-editor.css: {}
+  dependencies:
+    - core/drupal
+    - core/once
+    - core/drupalSettings

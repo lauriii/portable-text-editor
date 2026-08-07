@@ -1,0 +1,15 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - portable_text_editor
+name: 'Portable Text'
+format: portable_text
+weight: 5
+filters:
+  filter_portable_text:
+    id: filter_portable_text
+    provider: portable_text_editor
+    status: true
+    weight: 0
+    settings: {  }

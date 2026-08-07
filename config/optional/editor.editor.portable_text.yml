@@ -1,0 +1,20 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - filter.format.portable_text
+  module:
+    - portable_text_editor
+format: portable_text
+editor: portable_text
+settings:
+  toolbar:
+    - bold
+    - italic
+    - h2
+    - h3
+    - bulleted_list
+    - numbered_list
+    - link
+image_upload:
+  status: false
