@@ -97,7 +97,13 @@ class FilterPortableText extends FilterBase {
     }
 
     $output = '';
-    $open_list = NULL;
+    // The list elements currently open, outermost first. An item's "level" is
+    // its depth in this stack.
+    $lists = [];
+    // Whether a list item is open at the current depth. A nested list is
+    // rendered inside its parent item, so that item stays open meanwhile.
+    $item_open = FALSE;
+
     foreach ($decoded as $block) {
       if (!is_array($block) || ($block['_type'] ?? NULL) !== 'block') {
         // Block objects (images, embeds and so on) are not supported by this
@@ -106,30 +112,70 @@ class FilterPortableText extends FilterBase {
       }
 
       $list_item = is_string($block['listItem'] ?? NULL) ? $block['listItem'] : NULL;
-      $list_tag = self::LIST_TAGS[$list_item] ?? NULL;
-      // ponytail: lists render flat. Portable Text "level" is ignored because
-      // the toolbar cannot produce nested lists; add a stack of open tags here
-      // if indenting is ever added.
-      if ($list_tag !== $open_list) {
-        $output .= $open_list === NULL ? '' : '</' . $open_list . '>';
-        $output .= $list_tag === NULL ? '' : '<' . $list_tag . '>';
-        $open_list = $list_tag;
-      }
-
+      $list_tag = $list_item === NULL ? NULL : (self::LIST_TAGS[$list_item] ?? NULL);
       $children = $this->renderChildren($block);
-      if ($list_tag !== NULL) {
-        $output .= '<li>' . $children . '</li>';
+
+      if ($list_tag === NULL) {
+        $output .= $this->closeLists($lists, $item_open, 0);
+        $style = is_string($block['style'] ?? NULL) ? $block['style'] : 'normal';
+        $tag = self::STYLE_TAGS[$style] ?? 'p';
+        $output .= '<' . $tag . '>' . $children . '</' . $tag . '>';
         continue;
       }
 
-      $style = is_string($block['style'] ?? NULL) ? $block['style'] : 'normal';
-      $tag = self::STYLE_TAGS[$style] ?? 'p';
-      $output .= '<' . $tag . '>' . $children . '</' . $tag . '>';
-    }
-    if ($open_list !== NULL) {
-      $output .= '</' . $open_list . '>';
-    }
+      // Only ever go one level deeper at a time, so that a value which skips a
+      // level cannot produce a list nested outside a list item.
+      $level = max(1, (int) ($block['level'] ?? 1));
+      $level = min($level, count($lists) + 1);
 
+      $output .= $this->closeLists($lists, $item_open, $level);
+      if (count($lists) === $level) {
+        if ($item_open) {
+          $output .= '</li>';
+          $item_open = FALSE;
+        }
+        if (end($lists) !== $list_tag) {
+          $output .= '</' . array_pop($lists) . '>';
+        }
+      }
+      if (count($lists) < $level) {
+        $output .= '<' . $list_tag . '>';
+        $lists[] = $list_tag;
+      }
+      $output .= '<li>' . $children;
+      $item_open = TRUE;
+    }
+    $output .= $this->closeLists($lists, $item_open, 0);
+
+    return $output;
+  }
+
+  /**
+   * Closes open lists until only the wanted depth is left.
+   *
+   * @param array $lists
+   *   The open list elements, outermost first. Modified in place.
+   * @param bool $item_open
+   *   Whether a list item is open at the deepest level. Modified in place.
+   * @param int $depth
+   *   How many lists may stay open.
+   *
+   * @return string
+   *   The closing tags.
+   */
+  protected function closeLists(array &$lists, bool &$item_open, int $depth): string {
+    $output = '';
+    while (count($lists) > $depth) {
+      if ($item_open) {
+        $output .= '</li>';
+      }
+      $output .= '</' . array_pop($lists) . '>';
+      // The item that contained the list just closed is still open.
+      $item_open = TRUE;
+    }
+    if ($depth === 0) {
+      $item_open = FALSE;
+    }
     return $output;
   }
 

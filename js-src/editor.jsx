@@ -6,7 +6,7 @@
  * js/portable-text-editor.js.
  */
 
-import { StrictMode, useEffect, useId, useReducer, useState } from 'react';
+import { Fragment, StrictMode, useEffect, useId, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   EditorProvider,
@@ -26,8 +26,20 @@ import {
 } from '@portabletext/editor/selectors';
 
 const schemaDefinition = defineSchema({
-  decorators: [{ name: 'strong' }, { name: 'em' }],
-  styles: [{ name: 'normal' }, { name: 'h2' }, { name: 'h3' }],
+  decorators: [
+    { name: 'strong' },
+    { name: 'em' },
+    { name: 'underline' },
+    { name: 'strike-through' },
+    { name: 'code' },
+  ],
+  styles: [
+    { name: 'normal' },
+    { name: 'h2' },
+    { name: 'h3' },
+    { name: 'h4' },
+    { name: 'blockquote' },
+  ],
   lists: [{ name: 'bullet' }, { name: 'number' }],
   annotations: [{ name: 'link', fields: [{ name: 'href', type: 'string' }] }],
 });
@@ -39,44 +51,180 @@ const MOD = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform || navigat
   ? '⌘'
   : 'Ctrl+';
 
+// Icons are drawn rather than lettered, so that they do not need translating
+// and stay legible at the size a toolbar button gives them.
+const stroke = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+};
+
+function Icon({ children }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+      {children}
+    </svg>
+  );
+}
+
+const ICONS = {
+  bold: (
+    <Icon>
+      <path d="M4.5 2.5h4a2.75 2.75 0 0 1 0 5.5h-4zM4.5 8h4.75a2.75 2.75 0 0 1 0 5.5H4.5z" {...stroke} />
+    </Icon>
+  ),
+  italic: (
+    <Icon>
+      <path d="M10.5 2.75h-3m1 0-3 10.5m0 0h3m-3 0h-3" {...stroke} />
+    </Icon>
+  ),
+  underline: (
+    <Icon>
+      <path d="M4 2.5v5a4 4 0 0 0 8 0v-5M3.5 14h9" {...stroke} />
+    </Icon>
+  ),
+  strike_through: (
+    <Icon>
+      <path d="M2.5 8h11M11.5 4.2A3.5 3.5 0 0 0 8 2.5C5.8 2.5 4.5 3.6 4.5 5.1c0 1 .6 1.9 2 2.4M4.5 11.5A3.6 3.6 0 0 0 8 13.5c2.2 0 3.5-1 3.5-2.6 0-.8-.3-1.4-1-1.9" {...stroke} />
+    </Icon>
+  ),
+  code: (
+    <Icon>
+      <path d="M5.75 3.75 1.5 8l4.25 4.25M10.25 3.75 14.5 8l-4.25 4.25" {...stroke} />
+    </Icon>
+  ),
+  h2: (
+    <Icon>
+      <path d="M2 3v10M2 8h5M7 3v10M10.5 6.2a2 2 0 0 1 3.4 1.4c0 1.6-3.4 2.7-3.4 5.4h3.5" {...stroke} />
+    </Icon>
+  ),
+  h3: (
+    <Icon>
+      <path d="M2 3v10M2 8h5M7 3v10M10.5 5.8a2 2 0 1 1 1.7 3.1 2 2 0 1 1-1.7 3.2" {...stroke} />
+    </Icon>
+  ),
+  h4: (
+    <Icon>
+      <path d="M2 3v10M2 8h5M7 3v10M13.4 5.5v7.5M13.4 5.5 10.2 10.7h4" {...stroke} />
+    </Icon>
+  ),
+  blockquote: (
+    <Icon>
+      <path d="M2.5 12.5V9c0-2.8 1.4-4.6 3.5-5.5M2.5 9h3v3.5h-3zM9.5 12.5V9c0-2.8 1.4-4.6 3.5-5.5M9.5 9h3v3.5h-3z" {...stroke} />
+    </Icon>
+  ),
+  bulleted_list: (
+    <Icon>
+      <circle cx="2.5" cy="4" r="1.1" fill="currentColor" />
+      <circle cx="2.5" cy="8" r="1.1" fill="currentColor" />
+      <circle cx="2.5" cy="12" r="1.1" fill="currentColor" />
+      <path d="M6 4h8.5M6 8h8.5M6 12h8.5" {...stroke} />
+    </Icon>
+  ),
+  numbered_list: (
+    <Icon>
+      <path d="M6 4h8.5M6 8h8.5M6 12h8.5" {...stroke} />
+      <text x="0" y="5.4" fontSize="5" fill="currentColor">
+        1
+      </text>
+      <text x="0" y="9.4" fontSize="5" fill="currentColor">
+        2
+      </text>
+      <text x="0" y="13.4" fontSize="5" fill="currentColor">
+        3
+      </text>
+    </Icon>
+  ),
+  link: (
+    <Icon>
+      <path d="M6.6 9.4a2.9 2.9 0 0 1 0-4.1l1.7-1.7a2.9 2.9 0 1 1 4.1 4.1l-.9.9M9.4 6.6a2.9 2.9 0 0 1 0 4.1l-1.7 1.7a2.9 2.9 0 1 1-4.1-4.1l.9-.9" {...stroke} />
+    </Icon>
+  ),
+};
+
 /**
  * Toolbar buttons, keyed by the IDs the Editor plugin stores in config.
  *
  * `selector` reports whether the button is currently applied, `event` is the
- * editor event a click sends, and `shortcut` is shown in the button's tooltip.
+ * editor event a click sends, `shortcut` is shown in the button's tooltip, and
+ * `group` draws a divider wherever it changes.
  */
 const BUTTONS = {
   bold: {
     label: Drupal.t('Bold'),
     shortcut: `${MOD}B`,
+    group: 'text',
     selector: isActiveDecorator('strong'),
     event: { type: 'decorator.toggle', decorator: 'strong' },
   },
   italic: {
     label: Drupal.t('Italic'),
     shortcut: `${MOD}I`,
+    group: 'text',
     selector: isActiveDecorator('em'),
     event: { type: 'decorator.toggle', decorator: 'em' },
   },
+  underline: {
+    label: Drupal.t('Underline'),
+    shortcut: `${MOD}U`,
+    group: 'text',
+    selector: isActiveDecorator('underline'),
+    event: { type: 'decorator.toggle', decorator: 'underline' },
+  },
+  strike_through: {
+    label: Drupal.t('Strike-through'),
+    group: 'text',
+    selector: isActiveDecorator('strike-through'),
+    event: { type: 'decorator.toggle', decorator: 'strike-through' },
+  },
+  code: {
+    label: Drupal.t('Code'),
+    group: 'text',
+    selector: isActiveDecorator('code'),
+    event: { type: 'decorator.toggle', decorator: 'code' },
+  },
   h2: {
     label: Drupal.t('Heading 2'),
+    group: 'block',
     selector: isActiveStyle('h2'),
     event: { type: 'style.toggle', style: 'h2' },
   },
   h3: {
     label: Drupal.t('Heading 3'),
+    group: 'block',
     selector: isActiveStyle('h3'),
     event: { type: 'style.toggle', style: 'h3' },
   },
+  h4: {
+    label: Drupal.t('Heading 4'),
+    group: 'block',
+    selector: isActiveStyle('h4'),
+    event: { type: 'style.toggle', style: 'h4' },
+  },
+  blockquote: {
+    label: Drupal.t('Block quote'),
+    group: 'block',
+    selector: isActiveStyle('blockquote'),
+    event: { type: 'style.toggle', style: 'blockquote' },
+  },
   bulleted_list: {
     label: Drupal.t('Bulleted list'),
+    group: 'list',
     selector: isActiveListItem('bullet'),
     event: { type: 'list item.toggle', listItem: 'bullet' },
   },
   numbered_list: {
     label: Drupal.t('Numbered list'),
+    group: 'list',
     selector: isActiveListItem('number'),
     event: { type: 'list item.toggle', listItem: 'number' },
+  },
+  link: {
+    label: Drupal.t('Link'),
+    shortcut: `${MOD}K`,
+    group: 'link',
   },
 };
 
@@ -157,6 +305,7 @@ function ToolbarButton({ id, index }) {
       type="button"
       className="portable-text-editor__button"
       aria-pressed={active}
+      aria-label={label}
       tabIndex={index === 0 ? 0 : -1}
       title={shortcut ? `${label} (${shortcut})` : label}
       // Keep the selection in the editable while the button is used.
@@ -166,7 +315,7 @@ function ToolbarButton({ id, index }) {
         editor.send({ type: 'focus' });
       }}
     >
-      {label}
+      {ICONS[id]}
     </button>
   );
 }
@@ -174,6 +323,7 @@ function ToolbarButton({ id, index }) {
 function LinkButton({ index, open, onOpen }) {
   const editor = useEditor();
   const active = useEditorState(editor, isActiveAnnotation('link'));
+  const label = active ? Drupal.t('Edit link') : Drupal.t('Link');
 
   return (
     <button
@@ -181,12 +331,13 @@ function LinkButton({ index, open, onOpen }) {
       className="portable-text-editor__button"
       aria-pressed={active || open}
       aria-expanded={open}
+      aria-label={label}
       tabIndex={index === 0 ? 0 : -1}
-      title={`${active ? Drupal.t('Edit link') : Drupal.t('Link')} (${MOD}K)`}
+      title={`${label} (${MOD}K)`}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onOpen}
     >
-      {active ? Drupal.t('Edit link') : Drupal.t('Link')}
+      {ICONS.link}
     </button>
   );
 }
@@ -309,16 +460,27 @@ function LinkForm({ onClose }) {
   );
 }
 
+// The element each block style and inline decorator is drawn with while
+// editing. The filter makes the same choices when rendering for a visitor.
+const STYLE_TAGS = { h2: 'h2', h3: 'h3', h4: 'h4', blockquote: 'blockquote' };
+const DECORATOR_TAGS = {
+  strong: 'strong',
+  em: 'em',
+  underline: 'u',
+  'strike-through': 's',
+  code: 'code',
+};
+
 function renderStyle(props) {
-  if (props.schemaType.value === 'h2') return <h2>{props.children}</h2>;
-  if (props.schemaType.value === 'h3') return <h3>{props.children}</h3>;
-  return props.children;
+  // A block can carry both a style and a list item, but the filter renders it
+  // as a list item and drops the style, so the writing area does the same.
+  const Tag = props.block.listItem ? undefined : STYLE_TAGS[props.schemaType.value];
+  return Tag ? <Tag>{props.children}</Tag> : props.children;
 }
 
 function renderDecorator(props) {
-  if (props.value === 'strong') return <strong>{props.children}</strong>;
-  if (props.value === 'em') return <em>{props.children}</em>;
-  return props.children;
+  const Tag = DECORATOR_TAGS[props.value];
+  return Tag ? <Tag>{props.children}</Tag> : props.children;
 }
 
 function renderAnnotation(props) {
@@ -334,7 +496,9 @@ function renderAnnotation(props) {
 
 function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }) {
   const [linkOpen, setLinkOpen] = useState(false);
-  const hasLink = toolbar.includes('link');
+  // Config can outlive a button, so anything unknown here is dropped.
+  const buttons = toolbar.filter((id) => BUTTONS[id]);
+  const hasLink = buttons.includes('link');
 
   return (
     <EditorProvider initialConfig={{ schemaDefinition, initialValue }}>
@@ -351,18 +515,18 @@ function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }
         aria-label={Drupal.t('Text editor toolbar')}
         onKeyDown={onToolbarKeyDown}
       >
-        {toolbar.map((id, index) =>
-          id === 'link' ? (
-            <LinkButton
-              key={id}
-              index={index}
-              open={linkOpen}
-              onOpen={() => setLinkOpen(true)}
-            />
-          ) : (
-            <ToolbarButton key={id} id={id} index={index} />
-          ),
-        )}
+        {buttons.map((id, index) => (
+          <Fragment key={id}>
+            {index > 0 && BUTTONS[id].group !== BUTTONS[buttons[index - 1]].group ? (
+              <span className="portable-text-editor__divider" />
+            ) : null}
+            {id === 'link' ? (
+              <LinkButton index={index} open={linkOpen} onOpen={() => setLinkOpen(true)} />
+            ) : (
+              <ToolbarButton id={id} index={index} />
+            )}
+          </Fragment>
+        ))}
       </div>
       {linkOpen ? <LinkForm onClose={() => setLinkOpen(false)} /> : null}
       <PortableTextEditable

@@ -18,8 +18,13 @@ editor.settings.portable_text:
             choices:
               - bold
               - italic
+              - underline
+              - strike_through
+              - code
               - h2
               - h3
+              - h4
+              - blockquote
               - bulleted_list
               - numbered_list
               - link

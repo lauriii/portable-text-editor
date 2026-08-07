@@ -40,8 +40,13 @@ class PortableText extends EditorBase {
     return [
       'bold' => new TranslatableMarkup('Bold'),
       'italic' => new TranslatableMarkup('Italic'),
+      'underline' => new TranslatableMarkup('Underline'),
+      'strike_through' => new TranslatableMarkup('Strike-through'),
+      'code' => new TranslatableMarkup('Code'),
       'h2' => new TranslatableMarkup('Heading 2'),
       'h3' => new TranslatableMarkup('Heading 3'),
+      'h4' => new TranslatableMarkup('Heading 4'),
+      'blockquote' => new TranslatableMarkup('Block quote'),
       'bulleted_list' => new TranslatableMarkup('Bulleted list'),
       'numbered_list' => new TranslatableMarkup('Numbered list'),
       'link' => new TranslatableMarkup('Link'),

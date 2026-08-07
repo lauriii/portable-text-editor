@@ -127,6 +127,63 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<ul><li>Bullet</li></ul><ol><li>Number</li></ol>',
       ],
+      'a nested list is rendered inside its parent item' => [
+        [
+          self::block([self::span('One')], ['listItem' => 'bullet', 'level' => 1]),
+          self::block([self::span('Deep')], ['listItem' => 'bullet', 'level' => 2]),
+          self::block([self::span('Two')], ['listItem' => 'bullet', 'level' => 1]),
+        ],
+        '<ul><li>One<ul><li>Deep</li></ul></li><li>Two</li></ul>',
+      ],
+      'a nested list may use another list type' => [
+        [
+          self::block([self::span('One')], ['listItem' => 'bullet', 'level' => 1]),
+          self::block([self::span('Step')], ['listItem' => 'number', 'level' => 2]),
+        ],
+        '<ul><li>One<ol><li>Step</li></ol></li></ul>',
+      ],
+      'three levels nest and unwind' => [
+        [
+          self::block([self::span('a')], ['listItem' => 'bullet', 'level' => 1]),
+          self::block([self::span('b')], ['listItem' => 'bullet', 'level' => 2]),
+          self::block([self::span('c')], ['listItem' => 'bullet', 'level' => 3]),
+          self::block([self::span('d')], ['listItem' => 'bullet', 'level' => 1]),
+        ],
+        '<ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li><li>d</li></ul>',
+      ],
+      'a skipped level only goes one level deeper' => [
+        [
+          self::block([self::span('One')], ['listItem' => 'bullet', 'level' => 1]),
+          self::block([self::span('Deep')], ['listItem' => 'bullet', 'level' => 9]),
+        ],
+        '<ul><li>One<ul><li>Deep</li></ul></li></ul>',
+      ],
+      'a nested list is closed by a paragraph' => [
+        [
+          self::block([self::span('One')], ['listItem' => 'bullet', 'level' => 1]),
+          self::block([self::span('Deep')], ['listItem' => 'bullet', 'level' => 2]),
+          self::block([self::span('After')]),
+        ],
+        '<ul><li>One<ul><li>Deep</li></ul></li></ul><p>After</p>',
+      ],
+      'an unusable level falls back to the top level' => [
+        [self::block([self::span('One')], ['listItem' => 'bullet', 'level' => 'deep'])],
+        '<ul><li>One</li></ul>',
+      ],
+      'underline, code and strike-through decorators' => [
+        [
+          self::block([
+            self::span('u', ['underline']),
+            self::span('c', ['code']),
+            self::span('s', ['strike-through']),
+          ]),
+        ],
+        '<p><u>u</u><code>c</code><del>s</del></p>',
+      ],
+      'blockquote' => [
+        [self::block([self::span('Quoted')], ['style' => 'blockquote'])],
+        '<blockquote>Quoted</blockquote>',
+      ],
       'link' => [
         [
           self::block([self::span('Drupal', ['abc'])], [

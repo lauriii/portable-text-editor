@@ -47,14 +47,25 @@ The practical consequences:
 
 ## Editing experience
 
-The toolbar offers bold, italic, heading 2, heading 3, bulleted list, numbered
+The toolbar offers, in this order: bold, italic, underline, strike-through,
+code, heading 2, heading 3, heading 4, block quote, bulleted list, numbered
 list and link. Each button can be turned off per text format in the editor
-settings form.
+settings form, and dividers appear between the groups.
 
-- **Keyboard shortcuts.** Ctrl/Cmd+B and Ctrl/Cmd+I come from the Portable Text
-  editor itself, as do Tab and Shift+Tab for list indenting. Ctrl/Cmd+K opens
-  the link field. Button tooltips show the shortcut using the modifier the
-  visitor's platform actually uses.
+Buttons carry icons rather than words, so nothing in the toolbar needs
+translating; the name and shortcut are in each button's tooltip and accessible
+name.
+
+- **Keyboard shortcuts.** Ctrl/Cmd+B, Ctrl/Cmd+I and Ctrl/Cmd+U come from the
+  Portable Text editor itself, as do Tab and Shift+Tab for list indenting.
+  Ctrl/Cmd+K opens the link field. Button tooltips show the shortcut using the
+  modifier the visitor's platform actually uses.
+- **Nested lists.** Tab indents a list item and Shift+Tab outdents it, up to
+  any depth. The filter renders the nesting as real nested lists inside the
+  parent list item, and a nested list may use the other list type.
+- **List items ignore block styles.** A Portable Text block can carry both a
+  style and a list item. The filter renders such a block as a list item and
+  drops the style, and the writing area does the same, so the two agree.
 - **Links.** With the caret inside a link the button reads "Edit link" and the
   field opens with the current URL, offering Update and Remove. Otherwise it
   adds a link to the selection. Enter applies, Escape cancels. The field is a
@@ -62,6 +73,15 @@ settings form.
 - **Keyboard navigation.** The toolbar is a single tab stop, with arrow keys,
   Home and End moving between buttons, so Tab reaches the writing area without
   passing through every button.
+- **Pasting.** Pasted HTML is converted to Portable Text and is limited to what
+  the schema allows: headings, block quotes, lists, links and the five inline
+  decorators survive, and anything else, such as an `h1`, a table or an image,
+  is flattened to plain paragraphs. Nothing the toolbar cannot produce can get
+  into the stored value this way.
+
+Not included: markdown-style input rules such as typing `## ` for a heading,
+undo and redo buttons (Ctrl/Cmd+Z works from the keyboard), images and other
+block objects, and tables.
 - **Empty state.** An empty editor shows the textarea's own placeholder, or
   "Start writing…" when it has none.
 - **No flash of raw JSON.** Until the editor attaches, the textarea would show

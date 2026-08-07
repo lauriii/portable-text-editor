@@ -52,13 +52,26 @@ html.js
 }
 
 .portable-text-editor__button {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: 2px;
   background: transparent;
+  color: #333;
   cursor: pointer;
   font-size: 0.875rem;
   line-height: 1.4;
+}
+
+.portable-text-editor__divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 2px 4px;
+  background: #d4d4d4;
 }
 
 .portable-text-editor__button:hover,
@@ -86,6 +99,13 @@ html.js
   padding: 6px;
   border-bottom: 1px solid #b7b7b7;
   background: #fcfcfa;
+}
+
+/* These buttons carry text rather than an icon. */
+.portable-text-editor__link-form .portable-text-editor__button {
+  padding: 4px 10px;
+  border-color: #b7b7b7;
+  background: #fff;
 }
 
 .portable-text-editor__link-label {
@@ -122,12 +142,57 @@ html.js
 }
 
 /*
+ * Themes rarely style these inside a form, so the writing area shows what the
+ * rendered output will look like.
+ */
+.portable-text-editor__editable blockquote {
+  margin: 0.5em 0;
+  padding-inline-start: 1em;
+  border-inline-start: 3px solid #d4d4d4;
+  color: #555;
+}
+
+/* Admin themes like to hang a decorative quote mark outside the element. */
+.portable-text-editor__editable blockquote::before,
+.portable-text-editor__editable blockquote::after {
+  content: none;
+}
+
+.portable-text-editor__editable code {
+  padding: 0 0.25em;
+  border-radius: 2px;
+  background: #f2f2f2;
+  font-family: monospace;
+}
+
+/*
  * The editor marks list items on the block element itself rather than nesting
  * them in a real list, so the markers are drawn from those data attributes.
  */
 .portable-text-editor__editable [data-list-item] {
   position: relative;
   margin-inline-start: 1.75em;
+}
+
+/*
+ * ponytail: indenting is spelled out per level because CSS cannot multiply by
+ * an attribute value. Five levels is deeper than anyone nests in a body field;
+ * add more rules if that turns out to be wrong.
+ */
+.portable-text-editor__editable [data-level="2"] {
+  margin-inline-start: 3.5em;
+}
+
+.portable-text-editor__editable [data-level="3"] {
+  margin-inline-start: 5.25em;
+}
+
+.portable-text-editor__editable [data-level="4"] {
+  margin-inline-start: 7em;
+}
+
+.portable-text-editor__editable [data-level="5"] {
+  margin-inline-start: 8.75em;
 }
 
 .portable-text-editor__editable [data-list-item="bullet"]::before {
