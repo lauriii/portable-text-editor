@@ -108,9 +108,17 @@ class FilterPortableText extends FilterBase {
     $item_open = FALSE;
 
     foreach ($decoded as $block) {
-      if (!is_array($block) || ($block['_type'] ?? NULL) !== 'block') {
-        // Block objects (images, embeds and so on) are not supported by this
-        // editor, so they are skipped rather than guessed at.
+      if (!is_array($block)) {
+        continue;
+      }
+      if (($block['_type'] ?? NULL) === 'table') {
+        $output .= $this->closeLists($lists, $item_open, 0);
+        $output .= $this->renderTable($block);
+        continue;
+      }
+      if (($block['_type'] ?? NULL) !== 'block') {
+        // Other block objects, such as images and embeds, are not supported by
+        // this editor, so they are skipped rather than guessed at.
         continue;
       }
 
@@ -151,6 +159,50 @@ class FilterPortableText extends FilterBase {
     $output .= $this->closeLists($lists, $item_open, 0);
 
     return $output;
+  }
+
+  /**
+   * Renders a table block.
+   *
+   * Cells hold plain text, which is what the editor can produce, so every cell
+   * is escaped and nothing in one is treated as markup.
+   *
+   * @param array $block
+   *   A decoded table block.
+   *
+   * @return string
+   *   The table's HTML, or an empty string when it has no usable rows.
+   */
+  protected function renderTable(array $block): string {
+    $rows = $block['rows'] ?? NULL;
+    if (!is_array($rows) || !array_is_list($rows)) {
+      return '';
+    }
+
+    $header = ($block['header'] ?? FALSE) === TRUE;
+    $rendered = [];
+    foreach ($rows as $row) {
+      if (!is_array($row) || !array_is_list($row) || $row === []) {
+        continue;
+      }
+      // The first row is only a header row when the block says so.
+      $tag = $header && $rendered === [] ? 'th' : 'td';
+      $cells = '';
+      foreach ($row as $cell) {
+        $cells .= '<' . $tag . '>' . (is_string($cell) ? Html::escape($cell) : '') . '</' . $tag . '>';
+      }
+      $rendered[] = '<tr>' . $cells . '</tr>';
+    }
+    if ($rendered === []) {
+      return '';
+    }
+
+    if (!$header) {
+      return '<table><tbody>' . implode('', $rendered) . '</tbody></table>';
+    }
+    $head = array_shift($rendered);
+    $body = $rendered === [] ? '' : '<tbody>' . implode('', $rendered) . '</tbody>';
+    return '<table><thead>' . $head . '</thead>' . $body . '</table>';
   }
 
   /**

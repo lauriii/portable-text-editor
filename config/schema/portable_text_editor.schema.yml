@@ -31,6 +31,7 @@ editor.settings.portable_text:
               - bulleted_list
               - numbered_list
               - link
+              - table
 
 filter_settings.filter_portable_text:
   type: mapping

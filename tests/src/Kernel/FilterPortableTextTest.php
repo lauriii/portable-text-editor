@@ -209,6 +209,69 @@ class FilterPortableTextTest extends KernelTestBase {
         [self::block([self::span('Text', ['nope'])])],
         '<p>Text</p>',
       ],
+      'table with a header row' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => TRUE,
+            'rows' => [['A', 'B'], ['1', '2']],
+          ],
+        ],
+        '<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>',
+      ],
+      'table without a header row' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => FALSE,
+            'rows' => [['A', 'B'], ['1', '2']],
+          ],
+        ],
+        '<table><tbody><tr><td>A</td><td>B</td></tr><tr><td>1</td><td>2</td></tr></tbody></table>',
+      ],
+      'a header-only table has no body' => [
+        [['_type' => 'table', '_key' => 't1', 'header' => TRUE, 'rows' => [['A']]]],
+        '<table><thead><tr><th>A</th></tr></thead></table>',
+      ],
+      'table cells are escaped' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => FALSE,
+            'rows' => [['<script>alert(1)</script>', '"quoted" & co']],
+          ],
+        ],
+        '<table><tbody><tr><td>&lt;script&gt;alert(1)&lt;/script&gt;</td><td>&quot;quoted&quot; &amp; co</td></tr></tbody></table>',
+      ],
+      'a table closes an open list' => [
+        [
+          self::block([self::span('Item')], ['listItem' => 'bullet']),
+          ['_type' => 'table', '_key' => 't1', 'header' => FALSE, 'rows' => [['Cell']]],
+        ],
+        '<ul><li>Item</li></ul><table><tbody><tr><td>Cell</td></tr></tbody></table>',
+      ],
+      'a table with unusable rows renders nothing' => [
+        [['_type' => 'table', '_key' => 't1', 'rows' => 'nope']],
+        '',
+      ],
+      'a table row that is not a list is skipped' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => FALSE,
+            'rows' => [['Kept'], ['a' => 'b'], []],
+          ],
+        ],
+        '<table><tbody><tr><td>Kept</td></tr></tbody></table>',
+      ],
+      'a non-string cell renders empty' => [
+        [['_type' => 'table', '_key' => 't1', 'header' => FALSE, 'rows' => [[['x'], 'ok']]]],
+        '<table><tbody><tr><td></td><td>ok</td></tr></tbody></table>',
+      ],
       'block objects are skipped' => [
         [
           ['_type' => 'image', '_key' => 'i1', 'asset' => ['_ref' => 'x']],

@@ -24,5 +24,6 @@ settings:
     - bulleted_list
     - numbered_list
     - link
+    - table
 image_upload:
   status: false

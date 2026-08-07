@@ -46,7 +46,20 @@ const schemaDefinition = defineSchema({
   ],
   lists: [{ name: 'bullet' }, { name: 'number' }],
   annotations: [{ name: 'link', fields: [{ name: 'href', type: 'string' }] }],
+  blockObjects: [
+    {
+      name: 'table',
+      fields: [
+        { name: 'rows', type: 'array' },
+        { name: 'header', type: 'boolean' },
+      ],
+    },
+  ],
 });
+
+// A new table starts small; the controls grow it from there.
+const NEW_TABLE_ROWS = 2;
+const NEW_TABLE_COLUMNS = 2;
 
 // How this platform writes the modifier the editor's built-in shortcuts use.
 // The match is case insensitive because userAgentData reports "macOS" while
@@ -134,6 +147,11 @@ const FACES = {
   link: (
     <Icon>
       <path d="M6.6 9.4a2.9 2.9 0 0 1 0-4.1l1.7-1.7a2.9 2.9 0 1 1 4.1 4.1l-.9.9M9.4 6.6a2.9 2.9 0 0 1 0 4.1l-1.7 1.7a2.9 2.9 0 1 1-4.1-4.1l.9-.9" {...stroke} />
+    </Icon>
+  ),
+  table: (
+    <Icon>
+      <path d="M2 3h12v10H2zM2 6.5h12M2 10h12M6.5 6.5V13M10 6.5V13" {...stroke} />
     </Icon>
   ),
 };
@@ -242,6 +260,10 @@ const BUTTONS = {
     shortcut: `${MOD}K`,
     group: 'link',
   },
+  table: {
+    label: Drupal.t('Insert table'),
+    group: 'insert',
+  },
   styles: {
     label: Drupal.t('Block style'),
     group: 'style',
@@ -260,8 +282,15 @@ const STYLE_OPTIONS = [
 /**
  * Reads an editor selector, re-rendering whenever its answer can change.
  *
- * `editor.subscribe()` only reports document changes, so the selection event
- * is needed as well for state such as "is the caret inside bold text".
+ * Both events are needed and neither is enough. "selection" alone leaves a
+ * control showing what was true before the change it just made, because the
+ * next render only comes with the next caret move. "operation" alone misses
+ * state that depends on where the caret is, such as "is it inside bold text".
+ *
+ * It has to be "operation" rather than "mutation" or "patch": those are held
+ * back until the editor is dirty and arrive about a second late, which is long
+ * enough to watch the toolbar catch up. `editor.subscribe()` never fires at
+ * all.
  *
  * @param {object} editor
  *   The editor from useEditor().
@@ -274,12 +303,8 @@ const STYLE_OPTIONS = [
 function useEditorState(editor, selector) {
   const [, rerender] = useReducer((count) => count + 1, 0);
   useEffect(() => {
-    const value = editor.subscribe(rerender);
-    const selection = editor.on('selection', rerender);
-    return () => {
-      value.unsubscribe();
-      selection.unsubscribe();
-    };
+    const subscriptions = ['selection', 'operation'].map((event) => editor.on(event, rerender));
+    return () => subscriptions.forEach((subscription) => subscription.unsubscribe());
   }, [editor]);
   return selector(editor.getSnapshot());
 }
@@ -342,7 +367,18 @@ function ToolbarButton({ id, index }) {
       // Keep the selection in the editable while the button is used.
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
-        if (event) {
+        if (id === 'table') {
+          editor.send({
+            type: 'insert.block',
+            block: {
+              _type: 'table',
+              rows: emptyRows(NEW_TABLE_ROWS, NEW_TABLE_COLUMNS),
+              header: true,
+            },
+            placement: 'auto',
+          });
+        }
+        else if (event) {
           editor.send(event);
         }
         else {
@@ -386,7 +422,14 @@ function StyleSelect({ index }) {
       tabIndex={index === 0 ? 0 : -1}
       value={known ? remembered.current : 'normal'}
       onChange={(changed) => {
-        sendWhenFocused(editor, { type: 'style.add', style: changed.target.value });
+        // Setting the block directly rather than sending "style.add" for the
+        // current selection, because using the menu blurs the writing area and
+        // the selection the editor restores afterwards is not dependable.
+        const block = getFocusTextBlock(editor.getSnapshot());
+        if (block) {
+          editor.send({ type: 'block.set', at: block.path, props: { style: changed.target.value } });
+        }
+        editor.send({ type: 'focus' });
       }}
     >
       {STYLE_OPTIONS.map(([name, optionLabel]) => (
@@ -564,6 +607,123 @@ function renderDecorator(props) {
   return Tag ? <Tag>{props.children}</Tag> : props.children;
 }
 
+/**
+ * Builds an empty grid.
+ *
+ * @param {number} rows
+ *   How many rows.
+ * @param {number} columns
+ *   How many columns.
+ *
+ * @return {Array}
+ *   Rows of empty cell strings.
+ */
+function emptyRows(rows, columns) {
+  return Array.from({ length: rows }, () => Array.from({ length: columns }, () => ''));
+}
+
+/**
+ * The editing grid for a table block.
+ *
+ * The block is a block object, so the editor treats it as one opaque thing and
+ * this owns everything inside it. Cells hold plain text; formatting a cell
+ * would need an editor per cell.
+ */
+function TableBlock({ value, path }) {
+  const editor = useEditor();
+  // Which cell was last used, so that removing a row or column has a target.
+  const [at, setAt] = useState({ row: 0, column: 0 });
+  const rows = Array.isArray(value.rows) ? value.rows : [];
+  const columns = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
+  const header = value.header !== false;
+
+  const update = (props) => editor.send({ type: 'block.set', at: path, props });
+  const setRows = (next) => update({ rows: next });
+
+  return (
+    <div className="portable-text-editor__table" contentEditable={false}>
+      <table>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <tr key={rowIndex}>
+              {Array.from({ length: columns }, (ignored, columnIndex) => {
+                const Cell = header && rowIndex === 0 ? 'th' : 'td';
+                return (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <Cell key={columnIndex}>
+                    <input
+                      type="text"
+                      className="portable-text-editor__cell"
+                      aria-label={Drupal.t('Row @row, column @column', {
+                        '@row': rowIndex + 1,
+                        '@column': columnIndex + 1,
+                      })}
+                      value={row[columnIndex] || ''}
+                      onFocus={() => setAt({ row: rowIndex, column: columnIndex })}
+                      onChange={(changed) =>
+                        setRows(
+                          rows.map((current, index) =>
+                            index === rowIndex
+                              ? Object.assign([], current, { [columnIndex]: changed.target.value })
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                  </Cell>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="portable-text-editor__table-actions">
+        <label className="portable-text-editor__table-header">
+          <input
+            type="checkbox"
+            checked={header}
+            onChange={(changed) => update({ header: changed.target.checked })}
+          />
+          {Drupal.t('Header row')}
+        </label>
+        <button type="button" onClick={() => setRows([...rows, emptyRows(1, columns)[0]])}>
+          {Drupal.t('Add row')}
+        </button>
+        <button type="button" onClick={() => setRows(rows.map((row) => [...row, '']))}>
+          {Drupal.t('Add column')}
+        </button>
+        <button
+          type="button"
+          disabled={rows.length < 2}
+          onClick={() => setRows(rows.filter((row, index) => index !== at.row))}
+        >
+          {Drupal.t('Remove row')}
+        </button>
+        <button
+          type="button"
+          disabled={columns < 2}
+          onClick={() =>
+            setRows(rows.map((row) => row.filter((cell, index) => index !== at.column)))
+          }
+        >
+          {Drupal.t('Remove column')}
+        </button>
+        <button type="button" onClick={() => editor.send({ type: 'delete.block', at: path })}>
+          {Drupal.t('Remove table')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function renderBlock(props) {
+  if (props.value._type === 'table') {
+    return <TableBlock value={props.value} path={props.path} />;
+  }
+  return props.children;
+}
+
 function renderAnnotation(props) {
   if (props.schemaType.name === 'link') {
     return (
@@ -575,7 +735,18 @@ function renderAnnotation(props) {
   return props.children;
 }
 
-function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }) {
+/**
+ * Hands the editor to the code outside React, which needs to read its value.
+ */
+function ValueBridge({ onReady }) {
+  const editor = useEditor();
+  useEffect(() => {
+    onReady(editor);
+  }, [editor, onReady]);
+  return null;
+}
+
+function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onReady, onValue }) {
   const [linkOpen, setLinkOpen] = useState(false);
   // Config can outlive a button, so anything unknown here is dropped.
   const buttons = toolbar.filter((id) => BUTTONS[id]);
@@ -583,6 +754,7 @@ function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }
 
   return (
     <EditorProvider initialConfig={{ schemaDefinition, initialValue }}>
+      <ValueBridge onReady={onReady} />
       <EventListenerPlugin
         on={(event) => {
           if (event.type === 'mutation') {
@@ -617,6 +789,7 @@ function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onValue }
         renderStyle={renderStyle}
         renderDecorator={renderDecorator}
         renderAnnotation={renderAnnotation}
+        renderBlock={renderBlock}
         renderPlaceholder={() => (
           <span className="portable-text-editor__placeholder">{placeholder}</span>
         )}
@@ -681,12 +854,14 @@ function serializeValue(value) {
   }
   // ponytail: "empty" means no span has text. Revisit if block objects such as
   // images are ever added to the schema, since those carry no text.
-  const hasText = value.some(
-    (block) =>
-      Array.isArray(block.children) &&
-      block.children.some((child) => typeof child.text === 'string' && child.text.trim() !== ''),
+  const hasContent = value.some((block) =>
+    Array.isArray(block.children)
+      ? block.children.some((child) => typeof child.text === 'string' && child.text.trim() !== '')
+      : // Anything that is not a text block, such as a table, is content in
+        // its own right even when every cell is still empty.
+        block._type !== 'block',
   );
-  return hasText ? JSON.stringify(value) : '';
+  return hasContent ? JSON.stringify(value) : '';
 }
 
 // One record per attached textarea: the React root, its container, and the
@@ -717,6 +892,20 @@ Drupal.editors.portable_text = {
     const record = { container, wasRequired, callback: null };
     instances.set(element, record);
 
+    // Core asks the editor to serialize on submit, but through a handler that
+    // closed over whichever text format was active when the page loaded, so it
+    // asks the wrong editor once the format has been switched. Syncing here as
+    // well means what was typed is stored either way.
+    // @see Drupal.behaviors.editor.attach()
+    record.sync = () => {
+      if (record.editor) {
+        element.value = serializeValue(record.editor.getSnapshot().context.value);
+      }
+    };
+    if (element.form) {
+      element.form.addEventListener('submit', record.sync);
+    }
+
     const label = document.querySelector(`label[for="${element.id}"]`);
     record.root = createRoot(container);
     record.root.render(
@@ -725,6 +914,9 @@ Drupal.editors.portable_text = {
           toolbar={format.editorSettings.toolbar}
           initialValue={parseValue(element.value)}
           ariaLabel={label ? label.textContent.trim() : Drupal.t('Rich text editor')}
+          onReady={(editor) => {
+            record.editor = editor;
+          }}
           placeholder={element.placeholder || Drupal.t('Start writing…')}
           rows={Number(element.rows) || 5}
           onValue={(value) => {
@@ -743,10 +935,16 @@ Drupal.editors.portable_text = {
     if (!record) {
       return;
     }
-    // On "serialize" the editor stays alive and only the textarea is synced,
-    // which onValue already does on every change.
+    // "serialize" means the form is about to be submitted, over AJAX or not.
+    // The editor stays alive and only the textarea is synced, from the editor
+    // itself: the mutation event that normally keeps it up to date is held
+    // back for about a second, so the last thing typed would not be stored.
     if (trigger === 'serialize') {
+      record.sync();
       return;
+    }
+    if (element.form) {
+      element.form.removeEventListener('submit', record.sync);
     }
     record.root.unmount();
     record.container.remove();

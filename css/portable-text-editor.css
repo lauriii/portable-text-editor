@@ -230,6 +230,81 @@ html.js
   font-family: monospace;
 }
 
+.portable-text-editor__table {
+  margin: 0.75em 0;
+  padding: 8px;
+  border: 1px solid #dedede;
+  border-radius: 3px;
+  background: #fafafa;
+}
+
+.portable-text-editor__table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.portable-text-editor__table th,
+.portable-text-editor__table td {
+  padding: 0;
+  border: 1px solid #d4d4d4;
+  background: #fff;
+}
+
+.portable-text-editor__table th {
+  background: #f0f0f0;
+}
+
+.portable-text-editor__cell {
+  width: 100%;
+  padding: 5px 7px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.portable-text-editor__table th .portable-text-editor__cell {
+  font-weight: bold;
+}
+
+.portable-text-editor__cell:focus {
+  outline: 2px solid #26a769;
+  outline-offset: -2px;
+}
+
+.portable-text-editor__table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.portable-text-editor__table-actions button {
+  padding: 3px 8px;
+  border: 1px solid #d4d4d4;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+
+.portable-text-editor__table-actions button:hover:not(:disabled) {
+  background: #ebebeb;
+}
+
+.portable-text-editor__table-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.portable-text-editor__table-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-end: 4px;
+  font-size: 0.8125rem;
+}
+
 .portable-text-editor__editable mark {
   background: #ffe066;
   color: inherit;

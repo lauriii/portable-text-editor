@@ -49,9 +49,9 @@ The practical consequences:
 
 The toolbar offers, in this order: undo, redo, a block style menu, bold,
 italic, underline, strike-through, code, superscript, subscript, highlight,
-remove formatting, bulleted list, numbered list and link. Each control can be
-turned off per text format in the editor settings form, and dividers appear
-between the groups.
+remove formatting, bulleted list, numbered list, link and insert table. Each
+control can be turned off per text format in the editor settings form, and
+dividers appear between the groups.
 
 - **The block style menu shows the style the caret is in**, and switches
   between paragraph, heading 2, heading 3, heading 4 and block quote. It keeps
@@ -63,6 +63,12 @@ between the groups.
   in each control's tooltip and accessible name.
 - **Remove formatting** clears the link and only the decorators actually
   applied, so it does not fill the undo history with no-ops.
+- **Toolbar state is immediate.** Controls redraw on the editor's "operation"
+  event, which is emitted synchronously. The obvious alternatives are traps:
+  `editor.subscribe()` never fires at all, "mutation" and "patch" are held back
+  until the editor is dirty and land about a second late, and listening only
+  for selection changes leaves every control showing what was true before the
+  change it just made.
 - **Keyboard shortcuts.** Ctrl/Cmd+B, Ctrl/Cmd+I and Ctrl/Cmd+U come from the
   Portable Text editor itself, as do Tab and Shift+Tab for list indenting.
   Ctrl/Cmd+K opens the link field. Button tooltips show the shortcut using the
@@ -80,6 +86,11 @@ between the groups.
 - **Keyboard navigation.** The toolbar is a single tab stop, with arrow keys,
   Home and End moving between buttons, so Tab reaches the writing area without
   passing through every button.
+- **Tables.** A table is a Portable Text block object holding rows of plain
+  text, and the writing area edits it as a grid: add or remove a row or a
+  column, turn the header row on or off, or remove the table. Removing acts on
+  the row or column of the cell last used. Cells hold plain text, because
+  formatting inside one would need an editor per cell.
 - **Pasting.** Pasted HTML is converted to Portable Text and is limited to what
   the schema allows: headings, block quotes, lists, links and the eight inline
   decorators survive, and anything else, such as an `h1`, a table or an image,
@@ -87,6 +98,12 @@ between the groups.
   into the stored value this way.
 - **Empty state.** An empty editor shows the textarea's own placeholder, or
   "Start writing…" when it has none.
+- **What is typed is what is stored.** Core asks the editor to serialize on
+  submit through a handler that closed over whichever text format was active
+  when the page loaded, so after switching format it asks the other editor and
+  never this one. The textarea is therefore also synced from a submit listener
+  of its own; without it, writing in a freshly switched field and saving
+  straight away stored nothing.
 - **No flash of raw JSON.** Until the editor attaches, the textarea would show
   the stored Portable Text JSON, so the stylesheet hides it while keeping its
   space. If the editor never arrives, for instance because its JavaScript
@@ -94,8 +111,10 @@ between the groups.
   leaving an invisible field behind.
 
 Not included: markdown-style input rules such as typing `## ` for a heading,
-images and other block objects, tables, and code blocks (`pre`), which would
-need whitespace preservation that a Portable Text text block does not offer.
+images and other block objects, formatting inside table cells, and code blocks
+(`pre`), which would need whitespace preservation that a Portable Text text
+block does not offer. Pasted HTML tables are still flattened to paragraphs:
+the deserializer does not know about this module's table block.
 
 ## Requirements
 

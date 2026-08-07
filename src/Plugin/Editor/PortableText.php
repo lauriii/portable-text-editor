@@ -53,6 +53,7 @@ class PortableText extends EditorBase {
       'bulleted_list' => new TranslatableMarkup('Bulleted list'),
       'numbered_list' => new TranslatableMarkup('Numbered list'),
       'link' => new TranslatableMarkup('Link'),
+      'table' => new TranslatableMarkup('Insert table'),
     ];
   }
 
