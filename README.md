@@ -245,10 +245,17 @@ The functional JavaScript test needs a WebDriver endpoint, for example
 chromedriver on port 4444:
 
 ```
-MINK_DRIVER_ARGS_WEBDRIVER='["chrome",{"browserName":"chrome","goog:chromeOptions":{"args":["--headless=new","--no-sandbox"]}},"http://localhost:4444"]' \
+SIMPLETEST_BASE_URL=http://localhost \
+MINK_DRIVER_ARGS_WEBDRIVER='["chrome",{"goog:chromeOptions":{"args":["--headless=new","--no-sandbox","--disable-dev-shm-usage","--disable-gpu"]}},"http://localhost:4444"]' \
   ../vendor/bin/phpunit -c core/phpunit.xml.dist \
   modules/custom/portable_text_editor/tests/src/FunctionalJavascript
 ```
+
+Both environment variables are load-bearing in a container. Without the
+arguments, Chrome exits as soon as it starts and the failure is reported as
+"Chrome instance exited". Without a base URL the browser can reach under that
+exact name, logging in fails with "invalid cookie domain", because a cookie
+can only be set for the domain the browser is already on.
 
 Coding standards:
 

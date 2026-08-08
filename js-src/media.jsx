@@ -70,11 +70,61 @@ async function fetchPreview(media, uuid, alt) {
   if (!response.ok) {
     throw new Error(String(response.status));
   }
-  // Drupal's render pipeline indents its output, and every one of those
-  // newlines becomes an empty line in the preview, which grew a 270 pixel
-  // image into a 664 pixel block. Only runs holding a newline are dropped, so
-  // a deliberate space between two inline elements is left alone.
-  return (await response.text()).replace(/>[\n\r]\s*</g, '><');
+  return withoutLayoutWhitespace(await response.text());
+}
+
+/**
+ * Tags where whitespace between two of them is content rather than layout.
+ *
+ * Images are left out on purpose: Drupal's field templates leave whitespace
+ * beside them, and an image never needs a space to read correctly.
+ */
+const INLINE_TEXT = new Set([
+  'A', 'ABBR', 'B', 'CITE', 'CODE', 'EM', 'I', 'MARK',
+  'Q', 'S', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME', 'U',
+]);
+
+/**
+ * Whether a run of whitespace is holding two pieces of text apart.
+ *
+ * @param {Node} node
+ *   A whitespace-only text node.
+ *
+ * @return {boolean}
+ *   TRUE when taking it away would run two words together.
+ */
+function separatesText(node) {
+  const isText = (sibling) =>
+    sibling !== null && (sibling.nodeType === Node.TEXT_NODE || INLINE_TEXT.has(sibling.nodeName));
+  return isText(node.previousSibling) && isText(node.nextSibling);
+}
+
+/**
+ * Takes the whitespace Drupal's templates leave back out of rendered HTML.
+ *
+ * Each run of it becomes an empty line box in the preview, which grew a 270
+ * pixel image into a 318 pixel block and left the selection ring hanging well
+ * below the picture. Working on the parsed document rather than on the markup
+ * reaches the runs nested inside the media's own wrappers, and catches the ones
+ * made of plain spaces, both of which a pattern over the markup missed.
+ *
+ * @param {string} html
+ *   The rendered HTML.
+ *
+ * @return {string}
+ *   The same HTML without whitespace that only affects layout.
+ */
+function withoutLayoutWhitespace(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const spacing = [];
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue.trim() === '' && !separatesText(walker.currentNode)) {
+      spacing.push(walker.currentNode);
+    }
+  }
+  spacing.forEach((node) => node.remove());
+  return doc.body.innerHTML;
 }
 
 /**

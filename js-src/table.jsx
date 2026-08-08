@@ -54,9 +54,14 @@ function TableCell({ row, column, value, header, onChange, onFocus, onKeyDown })
   useEffect(() => {
     // A textarea does not size itself, and a one line cell that scrolls its
     // own text is the worst part of a table editor.
+    //
+    // The content sets a minimum rather than the height, so the stylesheet can
+    // still stretch the field over the whole cell. Setting the height outright
+    // left every cell beside a tall one ending early, and the strip below it
+    // did nothing when clicked.
     const element = field.current;
-    element.style.height = 'auto';
-    element.style.height = `${element.scrollHeight}px`;
+    element.style.minHeight = '0';
+    element.style.minHeight = `${element.scrollHeight}px`;
   }, [value]);
 
   return (
