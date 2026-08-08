@@ -4,7 +4,7 @@
  * and the focus move around them.
  */
 
-import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useId, useRef, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
 import {
   getActiveStyle,
@@ -13,7 +13,6 @@ import {
   isActiveAnnotation,
   isActiveDecorator,
   isActiveListItem,
-  isActiveStyle,
 } from '@portabletext/editor/selectors';
 import { FACES } from './icons.jsx';
 import { NEW_TABLE_ROWS, NEW_TABLE_COLUMNS } from './schema.jsx';
@@ -464,4 +463,4 @@ function Toolbar({ items, media, link, onOpenLink, onCloseLink }) {
   );
 }
 
-export { MOD, BUTTONS, Toolbar };
+export { Toolbar };

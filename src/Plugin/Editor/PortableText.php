@@ -91,10 +91,23 @@ class PortableText extends EditorBase implements ContainerFactoryPluginInterface
   }
 
   /**
+   * Returns the IDs of the toolbar buttons this editor can render.
+   *
+   * The config schema validates against this, so the list of buttons only has
+   * to be written down once.
+   *
+   * @return string[]
+   *   The button IDs.
+   */
+  public static function toolbarButtonIds(): array {
+    return array_keys(static::toolbarButtons());
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function getDefaultSettings(): array {
-    return ['toolbar' => array_keys(static::toolbarButtons())];
+    return ['toolbar' => static::toolbarButtonIds()];
   }
 
   /**
@@ -171,7 +184,7 @@ class PortableText extends EditorBase implements ContainerFactoryPluginInterface
   public function getJSSettings(EditorEntity $editor): array {
     // Only expose buttons this version of the module still knows about, so a
     // stale setting cannot make the JavaScript render an unknown button.
-    $known = array_keys(static::toolbarButtons());
+    $known = static::toolbarButtonIds();
     $enabled = $editor->getSettings()['toolbar'] ?? [];
     $settings = ['toolbar' => array_values(array_intersect($known, $enabled))];
 

@@ -182,19 +182,25 @@ function TableBlock({ value, path }) {
       element.selectionEnd === element.value.length;
 
     if (event.key === 'Tab') {
+      const flat = row * columns + column + (event.shiftKey ? -1 : 1);
+      if (flat < 0 || flat >= rows.length * columns) {
+        // At either end of the table, Tab has to be allowed to leave it. A
+        // table sits in a form, and a form the keyboard cannot get out of is
+        // worse than any convenience gained by trapping it.
+        //
+        // Tab past a last row that has something in it adds a row first, the
+        // way a word processor does. The row it adds is empty, so the next
+        // Tab leaves: filling a table in stays quick without the table ever
+        // becoming a trap.
+        const last = rows[rows.length - 1] || [];
+        if (flat >= 0 && last.some((cell) => (cell || '').trim() !== '')) {
+          event.preventDefault();
+          setRows([...rows, blank(columns)]);
+          setTimeout(() => focusCell(wrapper.current, rows.length, 0), 0);
+        }
+        return;
+      }
       event.preventDefault();
-      const forward = !event.shiftKey;
-      const flat = row * columns + column + (forward ? 1 : -1);
-      if (flat < 0) {
-        return;
-      }
-      if (flat >= rows.length * columns) {
-        // Tab past the last cell grows the table, which is how every editor
-        // worth using behaves.
-        setRows([...rows, blank(columns)]);
-        setTimeout(() => focusCell(wrapper.current, rows.length, 0), 0);
-        return;
-      }
       focusCell(wrapper.current, Math.floor(flat / columns), flat % columns);
       return;
     }

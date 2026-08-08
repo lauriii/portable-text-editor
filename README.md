@@ -110,11 +110,14 @@ dividers appear between the groups.
     removed rather than guessing which column should give way.
   - Cells grow as they are written in and hold several lines. A line break is
     rendered as `<br>`, after the text has been escaped.
-  - Tab and Shift+Tab move between cells, and Tab past the last cell adds a
-    row. Up and down move between rows, but only from a cell's first or last
-    line, so a cell holding several lines can still be moved around in. Left
-    and right move between cells from the ends of the text. Escape leaves the
-    table for the writing area.
+  - Tab and Shift+Tab move between cells. Tab past a last row that has
+    something in it adds a row, the way a word processor does; the row it adds
+    is empty, so the next Tab leaves the table. A table sits in a form, and a
+    form the keyboard cannot get out of is worse than the convenience of
+    trapping it. Escape leaves immediately. Up and down move between rows, but
+    only from a cell's first or last line, so a cell holding several lines can
+    still be moved around in. Left and right move between cells from the ends
+    of the text.
   - Controls float below the table and only while it has the focus, so they
     neither clutter the field nor shift the page. They insert a row above or
     below and a column left or right of the cell in use, delete that row or
@@ -174,6 +177,12 @@ nobody was looking at.
 `schema.jsx` and `src/Plugin/Filter/FilterPortableText.php` make the same
 choices about what each block and mark becomes, so they change together.
 
+The list of toolbar buttons is written down once, in
+`PortableText::toolbarButtonIds()`. The config schema validates against it
+through a `Choice` callback rather than repeating it, and both the plugin and
+the JavaScript drop any ID they do not recognise, so a stale setting degrades
+instead of breaking.
+
 Nothing here uses `requestAnimationFrame`: it never fires while a tab is in
 the background, which turns a missed frame into content that silently fails
 to save.
@@ -200,6 +209,9 @@ tree-shaken further, plus React and React DOM.
 
 - `tests/src/Kernel/FilterPortableTextTest.php` covers the filter, including
   invalid input and escaping.
+- `tests/src/Kernel/PortableTextEditorSettingsTest.php` covers what the Editor
+  plugin hands to its JavaScript, including hiding the media button when the
+  format cannot embed media.
 - `tests/src/FunctionalJavascript/PortableTextEditorTest.php` covers attaching,
   editing, saving and reopening a node.
 

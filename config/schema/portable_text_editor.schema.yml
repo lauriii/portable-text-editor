@@ -14,25 +14,9 @@ editor.settings.portable_text:
         label: 'Toolbar button'
         constraints:
           Choice:
-            # @see \Drupal\portable_text_editor\Plugin\Editor\PortableText::toolbarButtons()
-            choices:
-              - undo
-              - redo
-              - styles
-              - bold
-              - italic
-              - underline
-              - strike_through
-              - code
-              - superscript
-              - subscript
-              - highlight
-              - clear_format
-              - bulleted_list
-              - numbered_list
-              - link
-              - table
-              - media
+            # Generated from the plugin, so the list of buttons is written down
+            # in one place rather than kept in step across two files.
+            callback: '\Drupal\portable_text_editor\Plugin\Editor\PortableText::toolbarButtonIds'
 
 filter_settings.filter_portable_text:
   type: mapping
