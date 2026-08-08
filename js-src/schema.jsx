@@ -56,7 +56,11 @@ const NEW_TABLE_COLUMNS = 2;
 
 // The element each block style and inline decorator is drawn with while
 // editing. The filter makes the same choices when rendering for a visitor.
-const STYLE_TAGS = { h2: 'h2', h3: 'h3', h4: 'h4', blockquote: 'blockquote' };
+// A paragraph is drawn as one for the same reason as the rest, and for a
+// plainer one: without it a paragraph was a bare div, which has no margins of
+// its own, so paragraphs sat flush against each other while headings took
+// their spacing from being real headings.
+const STYLE_TAGS = { normal: 'p', h2: 'h2', h3: 'h3', h4: 'h4', blockquote: 'blockquote' };
 const DECORATOR_TAGS = {
   strong: 'strong',
   em: 'em',

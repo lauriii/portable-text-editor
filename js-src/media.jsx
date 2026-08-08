@@ -166,6 +166,20 @@ function MediaBlock({ value, path, media }) {
       tabIndex={0}
       aria-label={Drupal.t('Embedded media')}
       onFocus={() => setActive(true)}
+      onKeyDown={(event) => {
+        // Only when the media itself has the focus, so that a backspace in the
+        // alt text field goes on deleting a character.
+        if (event.target !== event.currentTarget) {
+          return;
+        }
+        if (event.key === 'Backspace' || event.key === 'Delete') {
+          event.preventDefault();
+          editor.send({ type: 'delete.block', at: path });
+          // The media held the focus, and it is gone, so hand it back to the
+          // writing area rather than leaving it on the page.
+          editor.send({ type: 'focus' });
+        }
+      }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) {
           setActive(false);
