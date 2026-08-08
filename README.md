@@ -97,6 +97,12 @@ dividers appear between the groups.
   modes and cache metadata. That filter has to be enabled on the format: it is
   also what gates access to the library for text editors, so without it the
   button hides itself and the editor settings form says why.
+- **The "/" menu.** Typing a slash on an empty block opens an insert menu:
+  paragraph, the headings, block quote, either list, a table and media. Typing
+  filters it, up and down move, Enter or Tab inserts, and Escape leaves the
+  slash as ordinary text. What it offers comes from the editor's schema at the
+  caret, so it cannot offer something the editor would refuse and it stays
+  honest when a text format has controls turned off.
 - **Markdown shortcuts.** Typing `## `, `### `, `#### `, `> `, `- `, `* ` or
   `1. ` at the start of a block turns it into that heading, quote or list. It
   is an editor behavior rather than a key handler, because a key handler reads
@@ -169,6 +175,7 @@ nobody was looking at.
 | `js-src/media.jsx` | The media library and the preview |
 | `js-src/balloon.jsx` | The floating toolbar the table and media share |
 | `js-src/render.jsx` | Which component draws which block |
+| `js-src/slash.jsx` | The "/" insert menu |
 | `js-src/markdown.js` | The markdown markers, as an editor behavior |
 | `js-src/value.js` | Moving between the textarea's string and the editor's value |
 | `js-src/editor-state.js` | Reading editor state from a React component |
@@ -200,6 +207,12 @@ To rebuild after changing `js-src/editor.jsx`:
 npm install
 npm run build
 ```
+
+The library's `version` in `portable_text_editor.libraries.yml` is the
+bundle's own, not core's, because the URL a browser caches is built from it.
+Bump it whenever the bundle is rebuilt, or browsers keep serving the bundle
+they already have. (With CSS and JS aggregation on, the aggregate URL already
+changes with the contents; this matters for sites that have it off.)
 
 The bundle is about 850 KB minified (about 260 KB gzipped). Most of that is
 `@portabletext/editor` itself, which ships as a single module and cannot be

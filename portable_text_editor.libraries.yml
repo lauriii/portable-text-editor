@@ -1,5 +1,9 @@
 editor:
-  version: VERSION
+  # The bundle's own version, not core's: it is committed and changes on its
+  # own schedule, and the URL a browser caches is built from this. Bump it
+  # whenever js/portable-text-editor.js is rebuilt, or browsers will keep
+  # serving the bundle they already have.
+  version: 1.0.1
   js:
     js/portable-text-editor.js: { preprocess: false, minified: true }
   css:

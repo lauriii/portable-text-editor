@@ -233,6 +233,47 @@ html.js
   font-family: monospace;
 }
 
+/*
+ * The "/" menu, anchored to the caret, so it is positioned against the
+ * viewport rather than against any of the editor's own boxes.
+ */
+.portable-text-editor__slash {
+  position: fixed;
+  z-index: 4;
+  min-width: 12em;
+  max-height: 15em;
+  margin: 0;
+  padding: 3px;
+  overflow-y: auto;
+  border: 1px solid #dedede;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  list-style: none;
+}
+
+.portable-text-editor__slash button {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #3b3b3b;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  text-align: start;
+}
+
+.portable-text-editor__slash button:hover {
+  background: #ebebeb;
+}
+
+.portable-text-editor__slash button[aria-current="true"] {
+  background: #dbe9f5;
+  color: #003b73;
+}
+
 .portable-text-editor__media {
   position: relative;
   margin: 0.75em 0;

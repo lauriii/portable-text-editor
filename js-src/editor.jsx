@@ -20,6 +20,7 @@ import { schemaDefinition, renderStyle, renderDecorator } from './schema.jsx';
 import { markdownBehavior } from './markdown.js';
 import { Toolbar } from './toolbar.jsx';
 import { buildRenderBlock, renderAnnotation } from './render.jsx';
+import { SlashMenu } from './slash.jsx';
 import { parseValue, serializeValue } from './value.js';
 
 // Stable, so the plugin does not unregister and register on every render.
@@ -87,6 +88,7 @@ function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, on
         onOpenLink={(at) => setLink({ at })}
         onCloseLink={() => setLink(null)}
       />
+      <SlashMenu media={media} />
       <Editable
         media={media}
         ariaLabel={ariaLabel}
