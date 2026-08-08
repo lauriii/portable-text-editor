@@ -151,6 +151,33 @@ deserializer does not know about this module's table block.
 
 Drupal 11 or 12, with the core `editor` and `filter` modules.
 
+## Code layout
+
+The JavaScript is split by concern rather than kept in one file, because one
+file is where a careless edit silently deletes a component in a part of it
+nobody was looking at.
+
+| File | What lives there |
+| --- | --- |
+| `js-src/editor.jsx` | The Drupal side: core's editor.js contract, and mounting React |
+| `js-src/schema.jsx` | What the editor may hold, and the element each part is drawn with |
+| `js-src/toolbar.jsx` | The toolbar's controls, the block style menu and the link field |
+| `js-src/table.jsx` | The table block and its grid |
+| `js-src/media.jsx` | The media library and the preview |
+| `js-src/balloon.jsx` | The floating toolbar the table and media share |
+| `js-src/render.jsx` | Which component draws which block |
+| `js-src/markdown.js` | The markdown markers, as an editor behavior |
+| `js-src/value.js` | Moving between the textarea's string and the editor's value |
+| `js-src/editor-state.js` | Reading editor state from a React component |
+| `js-src/icons.jsx` | The face of each control |
+
+`schema.jsx` and `src/Plugin/Filter/FilterPortableText.php` make the same
+choices about what each block and mark becomes, so they change together.
+
+Nothing here uses `requestAnimationFrame`: it never fires while a tab is in
+the background, which turns a missed frame into content that silently fails
+to save.
+
 ## Building the JavaScript
 
 The editor is a React library, so the shipped asset

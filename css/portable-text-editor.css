@@ -236,42 +236,36 @@ html.js
 .portable-text-editor__media {
   position: relative;
   margin: 0.75em 0;
-  padding: 8px;
-  border: 1px solid #dedede;
+  padding: 2px;
   border-radius: 3px;
-  background: #fafafa;
 }
 
-.portable-text-editor__media img {
+/*
+ * A box shadow rather than an outline: admin themes set their own outline on
+ * anything focusable, and win.
+ */
+.portable-text-editor__media--active,
+.portable-text-editor__media:focus {
+  box-shadow: 0 0 0 2px #26a769;
+  outline: none;
+}
+
+.portable-text-editor__media img,
+.portable-text-editor__media video,
+.portable-text-editor__media iframe {
+  display: block;
   max-width: 100%;
   height: auto;
 }
 
 .portable-text-editor__media-message {
   margin: 0;
-  padding: 12px;
+  padding: 16px;
+  border: 1px dashed #d4d4d4;
+  border-radius: 3px;
   color: #757575;
   font-size: 0.875rem;
   text-align: center;
-}
-
-.portable-text-editor__media-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.portable-text-editor__media-actions button {
-  padding: 3px 8px;
-  border: 1px solid #d4d4d4;
-  border-radius: 3px;
-  background: #fff;
-  cursor: pointer;
-  font-size: 0.8125rem;
-}
-
-.portable-text-editor__media-actions button:hover {
-  background: #ebebeb;
 }
 
 .portable-text-editor__table {
@@ -347,12 +341,12 @@ html.js
 }
 
 /*
- * The controls belong to the table being worked on, so they only appear while
- * it has the focus, and they float rather than pushing the page around. They
- * sit below the table: above it they would end up behind the editor's own
- * toolbar whenever a table is the first thing in the field.
+ * Controls belong to the thing being worked on, so they only appear while it
+ * has the focus or the pointer, and they float rather than pushing the page
+ * around. They sit below: above, they would end up behind the editor's own
+ * toolbar whenever the thing is the first in the field.
  */
-.portable-text-editor__table-actions {
+.portable-text-editor__balloon {
   position: absolute;
   z-index: 2;
   top: 100%;
@@ -360,24 +354,20 @@ html.js
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   margin-top: 4px;
-  padding: 4px 6px;
+  padding: 3px 4px;
   border: 1px solid #dedede;
   border-radius: 4px;
   background: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
 }
 
-.portable-text-editor__table-where {
-  margin-inline-end: 4px;
-  color: #757575;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.portable-text-editor__table-actions button {
-  padding: 3px 8px;
+.portable-text-editor__balloon button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
@@ -387,18 +377,51 @@ html.js
   white-space: nowrap;
 }
 
-.portable-text-editor__table-actions button:hover:not(:disabled) {
+.portable-text-editor__balloon button:hover:not(:disabled) {
   background: #ebebeb;
 }
 
-.portable-text-editor__table-actions button[aria-pressed="true"] {
+.portable-text-editor__balloon button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.portable-text-editor__balloon button[aria-expanded="true"] {
   background: #dbe9f5;
   color: #003b73;
 }
 
-.portable-text-editor__table-actions button:disabled {
-  opacity: 0.4;
-  cursor: default;
+.portable-text-editor__menu {
+  position: relative;
+}
+
+.portable-text-editor__caret {
+  width: 0;
+  height: 0;
+  margin-inline-start: 2px;
+  border-top: 4px solid currentColor;
+  border-inline-start: 3.5px solid transparent;
+  border-inline-end: 3.5px solid transparent;
+}
+
+.portable-text-editor__menu-list {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  inset-inline-start: 0;
+  min-width: 12em;
+  margin: 3px 0 0;
+  padding: 3px;
+  border: 1px solid #dedede;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+  list-style: none;
+}
+
+.portable-text-editor__menu-list button {
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .portable-text-editor__editable mark {
