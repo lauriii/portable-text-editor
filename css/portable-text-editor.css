@@ -32,6 +32,8 @@ html.js
 }
 
 .portable-text-editor {
+  /* The "/" menu is placed against this box. */
+  position: relative;
   border: 1px solid #b7b7b7;
   border-radius: 2px;
   background: #fff;
@@ -234,11 +236,11 @@ html.js
 }
 
 /*
- * The "/" menu, anchored to the caret, so it is positioned against the
- * viewport rather than against any of the editor's own boxes.
+ * The "/" menu, placed against the editor's own box so that it travels with
+ * the caret when the page scrolls.
  */
 .portable-text-editor__slash {
-  position: fixed;
+  position: absolute;
   z-index: 4;
   min-width: 12em;
   max-height: 15em;
