@@ -98,6 +98,18 @@ class FilterPortableTextTest extends KernelTestBase {
         [self::block([self::span('Odd')], ['style' => 'marquee'])],
         '<p>Odd</p>',
       ],
+      // Shift+Enter stores a newline inside the span. The writing area shows
+      // the break because it is pre-wrap; HTML needs to be told.
+      'a soft break survives to the page' => [
+        [self::block([self::span("Line one\nLine two")])],
+        "<p>Line one<br>\nLine two</p>",
+      ],
+      // The escaping has to happen first, or text could bring its own markup
+      // along with the break.
+      'a soft break does not let markup through' => [
+        [self::block([self::span("Safe\n<script>alert(1)</script>")])],
+        "<p>Safe<br>\n&lt;script&gt;alert(1)&lt;/script&gt;</p>",
+      ],
       'decorators' => [
         [
           self::block([

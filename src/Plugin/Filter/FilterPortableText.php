@@ -378,7 +378,12 @@ class FilterPortableText extends FilterBase {
         }
       }
 
-      $output .= $open . Html::escape($child['text']) . $close;
+      // A soft break, from Shift+Enter, is stored as a newline inside the span.
+      // The writing area honours it, being pre-wrap, and HTML does not, so
+      // without this the break shows while writing and is gone once published.
+      // Escaping first means the <br> tags are the only ones that can be
+      // there, which is what the table cells above do as well.
+      $output .= $open . nl2br(Html::escape($child['text']), FALSE) . $close;
     }
 
     return $output;

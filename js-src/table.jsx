@@ -156,11 +156,15 @@ function TableBlock({ value, path }) {
     setRows([...rows.slice(0, index), blank(columns), ...rows.slice(index)]);
     setTimeout(() => focusCell(wrapper.current, index, at.column), 0);
   };
+  // Widths are dropped rather than nulled: the field is declared an array, so
+  // null was refused, and the editor refuses the whole patch when one property
+  // of it is wrong. The rows went with it, which made adding or removing a
+  // column do nothing at all on any table that had ever been resized.
   const insertColumn = (offset) => {
     const index = at.column + offset;
     update({
       rows: rows.map((row) => [...row.slice(0, index), '', ...row.slice(index)]),
-      widths: null,
+      widths: [],
     });
     setTimeout(() => focusCell(wrapper.current, at.row, index), 0);
   };
@@ -171,7 +175,7 @@ function TableBlock({ value, path }) {
   const removeColumn = () => {
     update({
       rows: rows.map((row) => row.filter((cell, index) => index !== at.column)),
-      widths: null,
+      widths: [],
     });
     setTimeout(() => focusCell(wrapper.current, at.row, Math.max(0, at.column - 1)), 0);
   };

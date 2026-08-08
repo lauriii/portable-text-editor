@@ -8,6 +8,7 @@ import { Fragment, useRef, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
 import {
   getActiveStyle,
+  getFocusTextBlock,
   isActiveAnnotation,
   isActiveDecorator,
   isActiveListItem,
@@ -50,12 +51,14 @@ const BUTTONS = {
     shortcut: `${MOD}Z`,
     group: 'history',
     event: { type: 'history.undo' },
+    command: true,
   },
   redo: {
     label: Drupal.t('Redo'),
     shortcut: `${MOD}\u21e7Z`,
     group: 'history',
     event: { type: 'history.redo' },
+    command: true,
   },
   bold: {
     label: Drupal.t('Bold'),
@@ -111,6 +114,7 @@ const BUTTONS = {
   clear_format: {
     label: Drupal.t('Remove formatting'),
     group: 'text',
+    command: true,
   },
   bulleted_list: {
     label: Drupal.t('Bulleted list'),
@@ -132,10 +136,12 @@ const BUTTONS = {
   table: {
     label: Drupal.t('Insert table'),
     group: 'insert',
+    command: true,
   },
   media: {
     label: Drupal.t('Insert media'),
     group: 'insert',
+    command: true,
   },
   styles: {
     label: Drupal.t('Block style'),
@@ -180,14 +186,17 @@ function onToolbarKeyDown(event) {
 
 function ToolbarButton({ id, index, media }) {
   const editor = useEditor();
-  const { label, shortcut, selector, event } = BUTTONS[id];
+  const { label, shortcut, selector, event, command } = BUTTONS[id];
   const active = useEditorState(editor, selector || (() => false));
 
   return (
     <button
       type="button"
       className="portable-text-editor__button"
-      aria-pressed={active}
+      // A command either happens or it does not, so it has no pressed state to
+      // report. Saying aria-pressed="false" on one tells a screen reader it is
+      // a toggle that is currently off, which is a different thing.
+      aria-pressed={command ? undefined : active}
       aria-label={label}
       tabIndex={index === 0 ? 0 : -1}
       title={shortcut ? `${label} (${shortcut})` : label}

@@ -21,16 +21,30 @@ import { useEditor } from '@portabletext/editor';
  * @param {Function} onSelect
  *   Called with the chosen media's UUID.
  */
+// The handler waiting on the library, so there is never more than one.
+//
+// A dialog that is dismissed rather than used never reports anything, so a
+// handler that only unbinds itself on the way out stayed bound for the rest of
+// the page's life. The next selection then reached every handler that had piled
+// up, and one chosen item was inserted once per abandoned dialog.
+let listening = null;
+
 function openMediaLibrary(media, onSelect) {
+  if (listening) {
+    jQuery(window).off('editor:dialogsave', listening);
+  }
+
   // The library reports its choice through this event, which is how core's
   // own editors receive it too.
   const received = (event, values) => {
     jQuery(window).off('editor:dialogsave', received);
+    listening = null;
     const uuid = values?.attributes?.['data-entity-uuid'];
     if (uuid) {
       onSelect(uuid);
     }
   };
+  listening = received;
   jQuery(window).on('editor:dialogsave', received);
 
   Drupal.ajax({
@@ -219,13 +233,22 @@ function MediaBlock({ value, path, media }) {
             type="button"
             onClick={() =>
               openMediaLibrary(media, (uuid) =>
-                editor.send({ type: 'block.set', at: path, props: { uuid } }),
+                // The alt text described the picture that was here before, so
+                // it goes with it. Keeping it would hand a screen reader a
+                // confident description of something that is no longer there.
+                editor.send({ type: 'block.set', at: path, props: { uuid, alt: undefined } }),
               )
             }
           >
             {Drupal.t('Replace')}
           </button>
-          <button type="button" onClick={() => editor.send({ type: 'delete.block', at: path })}>
+          <button
+            type="button"
+            onClick={() => {
+              editor.send({ type: 'delete.block', at: path });
+              editor.send({ type: 'focus' });
+            }}
+          >
             {Drupal.t('Remove')}
           </button>
         </div>
@@ -250,6 +273,7 @@ function MediaBlock({ value, path, media }) {
                 event.preventDefault();
                 editor.send({ type: 'block.set', at: path, props: { alt: alt.trim() } });
                 setAlt(null);
+                editor.send({ type: 'focus' });
               }
             }}
           />
@@ -258,11 +282,18 @@ function MediaBlock({ value, path, media }) {
             onClick={() => {
               editor.send({ type: 'block.set', at: path, props: { alt: alt.trim() } });
               setAlt(null);
+              editor.send({ type: 'focus' });
             }}
           >
             {Drupal.t('Save')}
           </button>
-          <button type="button" onClick={() => setAlt(null)}>
+          <button
+            type="button"
+            onClick={() => {
+              setAlt(null);
+              editor.send({ type: 'focus' });
+            }}
+          >
             {Drupal.t('Cancel')}
           </button>
         </div>

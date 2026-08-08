@@ -69,6 +69,28 @@ function readable(href) {
 }
 
 /**
+ * Adds the scheme a bare domain is missing.
+ *
+ * Typing "example.com" and getting a link to it is the expectation everywhere,
+ * and core's own editor sets the same default. Stored as typed, it is a
+ * relative path, so it published as a link to a page under the current one.
+ *
+ * @param {string} href
+ *   What was typed.
+ *
+ * @return {string}
+ *   The same, with a scheme when it needed one.
+ */
+function withScheme(href) {
+  // A path, a fragment, a query or something already carrying a scheme is
+  // meant as written. Everything else is a domain someone typed short.
+  if (href === '' || /^([a-z][a-z0-9+.-]*:|[/#?])/i.test(href)) {
+    return href;
+  }
+  return `https://${href}`;
+}
+
+/**
  * The link balloon.
  *
  * @param {object|null} request
@@ -98,7 +120,7 @@ function LinkBalloon({ request, onClose }) {
   };
 
   const save = () => {
-    const href = value.trim();
+    const href = withScheme(value.trim());
     if (href === '') {
       return;
     }

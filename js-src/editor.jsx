@@ -18,6 +18,7 @@ import { EditorProvider, PortableTextEditable, useEditor } from '@portabletext/e
 import { BehaviorPlugin, EventListenerPlugin } from '@portabletext/editor/plugins';
 import { schemaDefinition, renderStyle, renderDecorator } from './schema.jsx';
 import { markdownBehavior } from './markdown.js';
+import { tabBehavior, indentTarget, moveFocus } from './indent.js';
 import { Toolbar } from './toolbar.jsx';
 import { buildRenderBlock, renderAnnotation } from './render.jsx';
 import { LinkBalloon } from './link.jsx';
@@ -25,7 +26,7 @@ import { SlashMenu } from './slash.jsx';
 import { parseValue, serializeValue } from './value.js';
 
 // Stable, so the plugin does not unregister and register on every render.
-const BEHAVIORS = [markdownBehavior];
+const BEHAVIORS = [markdownBehavior, tabBehavior];
 
 /**
  * Hands the editor to the code outside React, which needs to read its value.
@@ -61,6 +62,19 @@ function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink }) 
         if (hasLink && event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
           onOpenLink(editor.getSnapshot().context.selection);
+        }
+        // Tab either nests a list item or leaves the field. It is taken from
+        // the editor by a behavior so that it cannot also indent on its own,
+        // which is what made a list impossible to Tab out of.
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          const target = indentTarget(editor.getSnapshot(), event.shiftKey);
+          if (target) {
+            editor.send({ type: 'block.set', at: target.path, props: { level: target.level } });
+          }
+          else {
+            moveFocus(event.currentTarget, event.shiftKey);
+          }
         }
       }}
     />
