@@ -176,7 +176,10 @@ html.js
 }
 
 .portable-text-editor__editable {
-  padding: 8px 12px;
+  /* Shared with the placeholder, which has to be told where the text starts. */
+  --portable-text-editor-inset: 12px;
+
+  padding: 8px var(--portable-text-editor-inset);
   overflow-wrap: break-word;
 }
 
@@ -190,8 +193,15 @@ html.js
   box-shadow: none;
 }
 
+/*
+ * The editor puts the placeholder in a box of its own, offset from the writing
+ * area's padding box, which is inside the border but outside the padding. So it
+ * sat hard against the field's edge while the caret it stands in for was a
+ * padding further in. This puts it where the first character will be.
+ */
 .portable-text-editor__placeholder {
   position: absolute;
+  inset-inline-start: var(--portable-text-editor-inset);
   color: #757575;
   pointer-events: none;
 }
