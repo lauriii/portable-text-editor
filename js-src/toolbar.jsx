@@ -4,12 +4,10 @@
  * and the focus move around them.
  */
 
-import { Fragment, useId, useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
 import {
   getActiveStyle,
-  getFocusSpan,
-  getFocusTextBlock,
   isActiveAnnotation,
   isActiveDecorator,
   isActiveListItem,
@@ -305,161 +303,37 @@ function LinkButton({ index, open, onOpen }) {
 }
 
 /**
- * The URL field, shown on its own row so the toolbar does not move.
- *
- * ponytail: an inline row rather than window.prompt, because a native modal
- * cannot be reached by keyboard users predictably and blocks automated tests.
+ * The toolbar.
  */
-function LinkForm({ at, onClose }) {
-  const editor = useEditor();
-  // The link being edited has to be read before the field takes the focus,
-  // because that moves the selection out of the editor.
-  const [target] = useState(() => {
-    const snapshot = editor.getSnapshot();
-    const block = getFocusTextBlock(snapshot);
-    const span = getFocusSpan(snapshot);
-    if (!block || !span) {
-      return null;
-    }
-    // A span's marks are either decorator names or keys of the block's mark
-    // definitions, which is where a link keeps its URL.
-    const markDefs = block.node.markDefs || [];
-    const link = (span.node.marks || [])
-      .map((mark) => markDefs.find((markDef) => markDef._key === mark))
-      .find((markDef) => markDef && markDef._type === 'link');
-    if (!link) {
-      return null;
-    }
-    return {
-      href: typeof link.href === 'string' ? link.href : '',
-      // @see the "annotation.set" behavior, which expects a path ending in the
-      // mark definition's key.
-      at: [...block.path, 'markDefs', { _key: link._key }],
-      // Removing needs a selection that covers the link rather than a path,
-      // and the caret alone does not qualify.
-      // ponytail: the focused span is the whole link unless a decorator splits
-      // it; widen this to the neighbouring spans if that ever matters.
-      range: {
-        anchor: { path: span.path, offset: 0 },
-        focus: { path: span.path, offset: (span.node.text || '').length },
-      },
-    };
-  });
-  const [href, setHref] = useState(target ? target.href : '');
-  // More than one editor can be on a page, so the field needs its own id.
-  const fieldId = useId();
-
-  const close = () => {
-    onClose();
-    editor.send({ type: 'focus' });
-  };
-
-  const apply = () => {
-    if (href === '') {
-      return;
-    }
-    onClose();
-    if (target && target.at) {
-      // Changing an existing link edits its mark definition in place, so it
-      // works even when nothing is selected.
-      editor.send({ type: 'annotation.set', at: target.at, props: { href } });
-      editor.send({ type: 'focus' });
-      return;
-    }
-    // The editor ignores document changes while it is blurred, which it is
-    // whenever the URL field has been used, so the focus goes back first. It
-    // does not bring the selection with it, so the range the field was opened
-    // on is passed along rather than trusted to still be there.
-    editor.send({ type: 'focus' });
-    editor.send({
-      type: 'annotation.toggle',
-      annotation: { name: 'link', value: { href } },
-      ...(at ? { at } : {}),
-    });
-  };
-
-  const remove = () => {
-    onClose();
-    editor.send({
-      type: 'annotation.remove',
-      annotation: { name: 'link' },
-      at: target.range,
-    });
-    editor.send({ type: 'focus' });
-  };
-
-  return (
-    <div className="portable-text-editor__link-form">
-      <label className="portable-text-editor__link-label" htmlFor={fieldId}>
-        {Drupal.t('Link URL')}
-      </label>
-      {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-      <input
-        type="text"
-        autoFocus
-        id={fieldId}
-        className="portable-text-editor__link-input"
-        placeholder="https://"
-        value={href}
-        onChange={(e) => setHref(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            close();
-          }
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            apply();
-          }
-        }}
-      />
-      <button type="button" className="portable-text-editor__button" disabled={href === ''} onClick={apply}>
-        {target ? Drupal.t('Update') : Drupal.t('Apply')}
-      </button>
-      {target ? (
-        <button type="button" className="portable-text-editor__button" onClick={remove}>
-          {Drupal.t('Remove')}
-        </button>
-      ) : null}
-      <button type="button" className="portable-text-editor__button" onClick={close}>
-        {Drupal.t('Cancel')}
-      </button>
-    </div>
-  );
-}
-
 /**
- * The toolbar, and the link field that belongs to it.
+ * The toolbar.
  */
-function Toolbar({ items, media, link, onOpenLink, onCloseLink }) {
+function Toolbar({ items, media, linkOpen, onOpenLink }) {
   // Config can outlive a control, so anything unknown here is dropped.
   const buttons = items.filter((id) => BUTTONS[id]);
 
   return (
-    <>
-      <div
-        className="portable-text-editor__toolbar"
-        role="toolbar"
-        aria-label={Drupal.t('Text editor toolbar')}
-        onKeyDown={onToolbarKeyDown}
-      >
-        {buttons.map((id, index) => (
-          <Fragment key={id}>
-            {index > 0 && BUTTONS[id].group !== BUTTONS[buttons[index - 1]].group ? (
-              <span className="portable-text-editor__divider" />
-            ) : null}
-            {id === 'styles' ? <StyleSelect index={index} /> : null}
-            {id === 'link' ? (
-              <LinkButton index={index} open={link !== null} onOpen={onOpenLink} />
-            ) : null}
-            {id !== 'styles' && id !== 'link' ? (
-              <ToolbarButton id={id} index={index} media={media} />
-            ) : null}
-          </Fragment>
-        ))}
-      </div>
-      {link !== null ? <LinkForm at={link.at} onClose={onCloseLink} /> : null}
-    </>
+    <div
+      className="portable-text-editor__toolbar"
+      role="toolbar"
+      aria-label={Drupal.t('Text editor toolbar')}
+      onKeyDown={onToolbarKeyDown}
+    >
+      {buttons.map((id, index) => (
+        <Fragment key={id}>
+          {index > 0 && BUTTONS[id].group !== BUTTONS[buttons[index - 1]].group ? (
+            <span className="portable-text-editor__divider" />
+          ) : null}
+          {id === 'styles' ? <StyleSelect index={index} /> : null}
+          {id === 'link' ? (
+            <LinkButton index={index} open={linkOpen} onOpen={onOpenLink} />
+          ) : null}
+          {id !== 'styles' && id !== 'link' ? (
+            <ToolbarButton id={id} index={index} media={media} />
+          ) : null}
+        </Fragment>
+      ))}
+    </div>
   );
 }
 

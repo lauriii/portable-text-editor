@@ -14,6 +14,7 @@ import { useEditorState } from './editor-state.js';
 import { NEW_TABLE_ROWS, NEW_TABLE_COLUMNS } from './schema.jsx';
 import { emptyRows } from './table.jsx';
 import { openMediaLibrary } from './media.jsx';
+import { anchorBelow, caretRect } from './anchor.js';
 
 /**
  * What the menu can insert.
@@ -112,30 +113,6 @@ function readMarker(snapshot) {
 }
 
 /**
- * Where the caret is on screen.
- *
- * Read from the live selection rather than from the editor's snapshot, whose
- * selection reports the start of the block and would put the menu at the top
- * of the field instead of under the caret.
- *
- * @param {object} editor
- *   The editor from useEditor().
- *
- * @return {DOMRect|null}
- *   The caret's rect, or null when there is nowhere to anchor to.
- */
-function caretRect(editor) {
-  const selection = window.getSelection();
-  if (selection && selection.rangeCount > 0) {
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
-    if (rect.top !== 0 || rect.bottom !== 0) {
-      return rect;
-    }
-  }
-  return editor.dom.getSelectionRect(editor.getSnapshot());
-}
-
-/**
  * The insert menu, anchored to the caret.
  */
 function SlashMenu({ media }) {
@@ -206,21 +183,12 @@ function SlashMenu({ media }) {
     return null;
   }
 
-  // Placed against the editor rather than the viewport, so that it stays with
-  // the caret when the page scrolls instead of being left behind.
-  const host = editor.dom.getEditorElement()?.closest('.portable-text-editor');
-  const caret = caretRect(editor);
-  const box = host?.getBoundingClientRect();
   const chosen = index % matches.length;
 
   return (
     <ul
       className="portable-text-editor__slash"
-      style={
-        caret && box
-          ? { top: `${caret.bottom - box.top + 4}px`, left: `${caret.left - box.left}px` }
-          : undefined
-      }
+      style={anchorBelow(editor, caretRect(editor))}
     >
       {matches.map((item, position) => (
         <li key={item.label}>

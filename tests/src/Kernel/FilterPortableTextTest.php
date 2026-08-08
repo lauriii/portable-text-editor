@@ -224,6 +224,17 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-view-mode="teaser"></drupal-media>',
       ],
+      'media may carry alternative text' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'alt' => 'A cat "reading" <b>a book</b>',
+          ],
+        ],
+        '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" alt="A cat &quot;reading&quot; &lt;b&gt;a book&lt;/b&gt;"></drupal-media>',
+      ],
       'media without a usable UUID renders nothing' => [
         [['_type' => 'media', '_key' => 'm1', 'uuid' => '"><script>alert(1)</script>']],
         '',

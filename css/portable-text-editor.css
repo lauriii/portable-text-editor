@@ -161,36 +161,6 @@ html.js
   line-height: 0;
 }
 
-.portable-text-editor__link-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 6px;
-  border-bottom: 1px solid #b7b7b7;
-  background: #fcfcfa;
-}
-
-/* These buttons carry text rather than an icon. */
-.portable-text-editor__link-form .portable-text-editor__button {
-  padding: 4px 10px;
-  border-color: #b7b7b7;
-  background: #fff;
-}
-
-.portable-text-editor__link-label {
-  font-size: 0.875rem;
-  font-weight: bold;
-}
-
-.portable-text-editor__link-input {
-  flex: 1 1 16em;
-  min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid #b7b7b7;
-  border-radius: 2px;
-}
-
 .portable-text-editor__editable {
   padding: 8px 12px;
   overflow-wrap: break-word;
@@ -301,6 +271,13 @@ html.js
   height: auto;
 }
 
+/* Holds the space the media will take, without saying anything about it. */
+.portable-text-editor__media-waiting {
+  min-height: 6em;
+  border-radius: 3px;
+  background: #f5f5f5;
+}
+
 .portable-text-editor__media-message {
   margin: 0;
   padding: 16px;
@@ -404,6 +381,31 @@ html.js
   border-radius: 4px;
   background: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+.portable-text-editor__link-label {
+  padding-inline-start: 4px;
+  color: #757575;
+  font-size: 0.75rem;
+}
+
+.portable-text-editor__link-input {
+  width: 18em;
+  max-width: 40vw;
+  padding: 4px 6px;
+  border: 1px solid #d4d4d4;
+  border-radius: 3px;
+  font-size: 0.8125rem;
+}
+
+.portable-text-editor__link-shown {
+  max-width: 24em;
+  padding: 0 4px;
+  overflow: hidden;
+  color: #0071b8;
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .portable-text-editor__balloon button {

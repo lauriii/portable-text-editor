@@ -98,9 +98,11 @@ class FilterPortableText extends FilterBase {
       if (preg_match('#^<drupal-media\b([^>]*)></drupal-media>$#i', $text, $element)) {
         preg_match('#data-entity-uuid="([^"]*)"#i', $element[1], $uuid);
         preg_match('#data-view-mode="([^"]*)"#i', $element[1], $view_mode);
+        preg_match('#\balt="([^"]*)"#i', $element[1], $alt);
         return $this->renderMedia([
           'uuid' => $uuid[1] ?? NULL,
           'viewMode' => $view_mode[1] ?? NULL,
+          'alt' => isset($alt[1]) ? Html::decodeEntities($alt[1]) : NULL,
         ]);
       }
 
@@ -208,6 +210,12 @@ class FilterPortableText extends FilterBase {
     $element = '<drupal-media data-entity-type="media" data-entity-uuid="' . Html::escape($uuid) . '"';
     if (is_string($block['viewMode'] ?? NULL) && $block['viewMode'] !== '') {
       $element .= ' data-view-mode="' . Html::escape($block['viewMode']) . '"';
+    }
+    // Alternative text written here overrides the media item's own, which is
+    // what core's filter does with this attribute.
+    // @see \Drupal\media\Plugin\Filter\MediaEmbed::renderMissingMediaLink()
+    if (is_string($block['alt'] ?? NULL) && $block['alt'] !== '') {
+      $element .= ' alt="' . Html::escape($block['alt']) . '"';
     }
     return $element . '></drupal-media>';
   }

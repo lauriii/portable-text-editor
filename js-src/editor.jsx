@@ -20,6 +20,7 @@ import { schemaDefinition, renderStyle, renderDecorator } from './schema.jsx';
 import { markdownBehavior } from './markdown.js';
 import { Toolbar } from './toolbar.jsx';
 import { buildRenderBlock, renderAnnotation } from './render.jsx';
+import { LinkBalloon } from './link.jsx';
 import { SlashMenu } from './slash.jsx';
 import { parseValue, serializeValue } from './value.js';
 
@@ -67,7 +68,8 @@ function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink }) 
 }
 
 function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, onReady, onValue }) {
-  // Null when the link field is closed, otherwise the range it was opened on.
+  // Null unless the toolbar or the shortcut asked to edit a link, in which
+  // case it carries the range the link should go on.
   const [link, setLink] = useState(null);
 
   return (
@@ -84,10 +86,12 @@ function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, on
       <Toolbar
         items={toolbar}
         media={media}
-        link={link}
+        linkOpen={link !== null}
         onOpenLink={(at) => setLink({ at })}
-        onCloseLink={() => setLink(null)}
       />
+      {toolbar.includes('link') ? (
+        <LinkBalloon request={link} onClose={() => setLink(null)} />
+      ) : null}
       <SlashMenu media={media} />
       <Editable
         media={media}

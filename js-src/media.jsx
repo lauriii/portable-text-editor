@@ -54,12 +54,15 @@ function openMediaLibrary(media, onSelect) {
  *   The media settings from the Editor plugin.
  * @param {string} uuid
  *   The media item's UUID.
+ * @param {string|undefined} alt
+ *   Alternative text overriding the media item's own, if there is any.
  *
  * @return {Promise<string>}
  *   The rendered HTML.
  */
-async function fetchPreview(media, uuid) {
-  const element = `<drupal-media data-entity-type="media" data-entity-uuid="${uuid}"></drupal-media>`;
+async function fetchPreview(media, uuid, alt) {
+  const attributes = alt ? ` alt="${alt.replace(/"/g, '&quot;')}"` : '';
+  const element = `<drupal-media data-entity-type="media" data-entity-uuid="${uuid}"${attributes}></drupal-media>`;
   const response = await fetch(
     `${media.previewUrl}?${new URLSearchParams({ text: element, uuid })}`,
     { headers: { 'X-Drupal-MediaPreview-CSRF-Token': media.previewCsrfToken } },
@@ -85,10 +88,12 @@ function MediaBlock({ value, path, media }) {
   const editor = useEditor();
   const [preview, setPreview] = useState(null);
   const [active, setActive] = useState(false);
+  // A string means the alt text is being edited; null means it is not.
+  const [alt, setAlt] = useState(null);
 
   useEffect(() => {
     let current = true;
-    fetchPreview(media, value.uuid)
+    fetchPreview(media, value.uuid, value.alt)
       .then((html) => {
         if (current) {
           setPreview({ html });
@@ -102,7 +107,7 @@ function MediaBlock({ value, path, media }) {
     return () => {
       current = false;
     };
-  }, [value.uuid, media]);
+  }, [value.uuid, value.alt, media]);
 
   return (
     <div
@@ -118,13 +123,16 @@ function MediaBlock({ value, path, media }) {
       }}
       onMouseEnter={() => setActive(true)}
       onMouseLeave={(event) => {
-        if (!event.currentTarget.contains(document.activeElement)) {
+        if (alt === null && !event.currentTarget.contains(document.activeElement)) {
           setActive(false);
         }
       }}
     >
       {preview === null ? (
-        <p className="portable-text-editor__media-message">{Drupal.t('Loading media…')}</p>
+        // A message here would be a flash of text that then jumps out of the
+        // way once the media arrives, so the space it will take is held
+        // quietly instead.
+        <div className="portable-text-editor__media-waiting" />
       ) : null}
       {preview?.failed ? (
         <p className="portable-text-editor__media-message">
@@ -137,8 +145,12 @@ function MediaBlock({ value, path, media }) {
         // eslint-disable-next-line react/no-danger
         <div dangerouslySetInnerHTML={{ __html: preview.html }} />
       ) : null}
-      {active ? (
+      {active && alt === null ? (
         <div className="portable-text-editor__balloon" role="toolbar" aria-label={Drupal.t('Media')}>
+          <button type="button" onClick={() => setAlt(value.alt || '')}>
+            {value.alt ? Drupal.t('Alt text: @alt', { '@alt': value.alt }) : Drupal.t('Add alt text')}
+          </button>
+          <span className="portable-text-editor__divider" />
           <button
             type="button"
             onClick={() =>
@@ -151,6 +163,43 @@ function MediaBlock({ value, path, media }) {
           </button>
           <button type="button" onClick={() => editor.send({ type: 'delete.block', at: path })}>
             {Drupal.t('Remove')}
+          </button>
+        </div>
+      ) : null}
+      {active && alt !== null ? (
+        <div className="portable-text-editor__balloon">
+          <span className="portable-text-editor__link-label">{Drupal.t('Alt text')}</span>
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+          <input
+            type="text"
+            autoFocus
+            className="portable-text-editor__link-input"
+            aria-label={Drupal.t('Alternative text for this media')}
+            value={alt}
+            onChange={(changed) => setAlt(changed.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                setAlt(null);
+              }
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                editor.send({ type: 'block.set', at: path, props: { alt: alt.trim() } });
+                setAlt(null);
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              editor.send({ type: 'block.set', at: path, props: { alt: alt.trim() } });
+              setAlt(null);
+            }}
+          >
+            {Drupal.t('Save')}
+          </button>
+          <button type="button" onClick={() => setAlt(null)}>
+            {Drupal.t('Cancel')}
           </button>
         </div>
       ) : null}

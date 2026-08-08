@@ -79,10 +79,11 @@ dividers appear between the groups.
 - **List items ignore block styles.** A Portable Text block can carry both a
   style and a list item. The filter renders such a block as a list item and
   drops the style, and the writing area does the same, so the two agree.
-- **Links.** With the caret inside a link the button reads "Edit link" and the
-  field opens with the current URL, offering Update and Remove. Otherwise it
-  adds a link to the selection. Enter applies, Escape cancels. The field is a
-  row of its own so opening it does not move the toolbar.
+- **Links.** Putting the caret in a link shows a balloon on it with the URL,
+  which opens in a new tab, and Edit and Unlink. Ctrl/Cmd+K or the toolbar
+  button opens the same balloon with the URL field ready, on the link the
+  caret is in or on whatever is selected. Enter saves, Escape cancels. It
+  floats, so nothing that is being written moves out from under the writer.
 - **Keyboard navigation.** The toolbar is a single tab stop, with arrow keys,
   Home and End moving between buttons, so Tab reaches the writing area without
   passing through every button.
@@ -92,6 +93,9 @@ dividers appear between the groups.
   offers, and to whom, is Drupal's decision rather than this module's. A
   chosen item is stored as a media block holding its UUID, and the writing
   area shows it as Drupal renders it, through core's media preview endpoint.
+  Its controls carry alternative text, which overrides what the media item
+  itself carries and is what core's filter does with an `alt` attribute; the
+  preview redraws with it, so the writer sees what a screen reader will get.
   On output the filter emits the `<drupal-media>` element that core's "Embed
   media" filter reads, so media is rendered with its own access checking, view
   modes and cache metadata. That filter has to be enabled on the format: it is
@@ -175,7 +179,9 @@ nobody was looking at.
 | `js-src/media.jsx` | The media library and the preview |
 | `js-src/balloon.jsx` | The floating toolbar the table and media share |
 | `js-src/render.jsx` | Which component draws which block |
+| `js-src/link.jsx` | Links, and the balloon that shows and edits them |
 | `js-src/slash.jsx` | The "/" insert menu |
+| `js-src/anchor.js` | Placing a floating thing next to the caret |
 | `js-src/markdown.js` | The markdown markers, as an editor behavior |
 | `js-src/value.js` | Moving between the textarea's string and the editor's value |
 | `js-src/editor-state.js` | Reading editor state from a React component |
