@@ -9,3 +9,10 @@ editor:
     - core/drupal
     - core/once
     - core/drupalSettings
+    # The media library is opened as a Drupal modal, over AJAX, and reports
+    # its choice through a jQuery event.
+    - core/jquery
+    - core/drupal.ajax
+    - core/drupal.dialog.ajax
+    # Provides the AJAX command the media library answers with.
+    - editor/drupal.editor.dialog

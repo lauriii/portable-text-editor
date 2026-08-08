@@ -233,6 +233,47 @@ html.js
   font-family: monospace;
 }
 
+.portable-text-editor__media {
+  position: relative;
+  margin: 0.75em 0;
+  padding: 8px;
+  border: 1px solid #dedede;
+  border-radius: 3px;
+  background: #fafafa;
+}
+
+.portable-text-editor__media img {
+  max-width: 100%;
+  height: auto;
+}
+
+.portable-text-editor__media-message {
+  margin: 0;
+  padding: 12px;
+  color: #757575;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.portable-text-editor__media-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.portable-text-editor__media-actions button {
+  padding: 3px 8px;
+  border: 1px solid #d4d4d4;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+
+.portable-text-editor__media-actions button:hover {
+  background: #ebebeb;
+}
+
 .portable-text-editor__table {
   position: relative;
   margin: 0.75em 0;
@@ -246,6 +287,7 @@ html.js
 
 .portable-text-editor__table th,
 .portable-text-editor__table td {
+  position: relative;
   padding: 0;
   border: 1px solid #d4d4d4;
   background: #fff;
@@ -263,6 +305,23 @@ html.js
 
 .portable-text-editor__table th.portable-text-editor__cell--in-line {
   background: #e8f1f9;
+}
+
+/* The grip between two columns. */
+.portable-text-editor__resize {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  inset-inline-end: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.portable-text-editor__resize:hover,
+.portable-text-editor__resize:active {
+  background: #26a769;
 }
 
 .portable-text-editor__cell {

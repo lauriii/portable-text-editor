@@ -209,6 +209,56 @@ class FilterPortableTextTest extends KernelTestBase {
         [self::block([self::span('Text', ['nope'])])],
         '<p>Text</p>',
       ],
+      'media becomes an embed element for core to render' => [
+        [['_type' => 'media', '_key' => 'm1', 'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f']],
+        '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f"></drupal-media>',
+      ],
+      'media may name a view mode' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'viewMode' => 'teaser',
+          ],
+        ],
+        '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-view-mode="teaser"></drupal-media>',
+      ],
+      'media without a usable UUID renders nothing' => [
+        [['_type' => 'media', '_key' => 'm1', 'uuid' => '"><script>alert(1)</script>']],
+        '',
+      ],
+      'a media item closes an open list' => [
+        [
+          self::block([self::span('Item')], ['listItem' => 'bullet']),
+          ['_type' => 'media', '_key' => 'm1', 'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f'],
+        ],
+        '<ul><li>Item</li></ul><drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f"></drupal-media>',
+      ],
+      'column widths render as a colgroup' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => FALSE,
+            'widths' => [30, 70],
+            'rows' => [['A', 'B']],
+          ],
+        ],
+        '<table><colgroup><col style="width:30%"><col style="width:70%"></colgroup><tbody><tr><td>A</td><td>B</td></tr></tbody></table>',
+      ],
+      'unusable column widths are dropped' => [
+        [
+          [
+            '_type' => 'table',
+            '_key' => 't1',
+            'header' => FALSE,
+            'widths' => ['x"><script>', 'y'],
+            'rows' => [['A', 'B']],
+          ],
+        ],
+        '<table><tbody><tr><td>A</td><td>B</td></tr></tbody></table>',
+      ],
       'table with a header row' => [
         [
           [

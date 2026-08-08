@@ -4,11 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\portable_text_editor\Plugin\Editor;
 
+use Drupal\Core\Access\CsrfTokenGenerator;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Url;
 use Drupal\editor\Attribute\Editor;
 use Drupal\editor\Entity\Editor as EditorEntity;
 use Drupal\editor\Plugin\EditorBase;
+use Drupal\media_library\MediaLibraryState;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Defines a Portable Text based text editor for Drupal.
@@ -28,7 +35,32 @@ use Drupal\editor\Plugin\EditorBase;
     'textarea',
   ],
 )]
-class PortableText extends EditorBase {
+class PortableText extends EditorBase implements ContainerFactoryPluginInterface {
+
+  public function __construct(
+    array $configuration,
+    $plugin_id,
+    $plugin_definition,
+    protected ModuleHandlerInterface $moduleHandler,
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected CsrfTokenGenerator $csrfToken,
+  ) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): static {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('module_handler'),
+      $container->get('entity_type.manager'),
+      $container->get('csrf_token'),
+    );
+  }
 
   /**
    * Returns the toolbar buttons this editor can render.
@@ -54,6 +86,7 @@ class PortableText extends EditorBase {
       'numbered_list' => new TranslatableMarkup('Numbered list'),
       'link' => new TranslatableMarkup('Link'),
       'table' => new TranslatableMarkup('Insert table'),
+      'media' => new TranslatableMarkup('Insert media (needs the "Embed media" filter)'),
     ];
   }
 
@@ -81,6 +114,15 @@ class PortableText extends EditorBase {
       '#default_value' => $settings['toolbar'] ?? [],
       '#element_validate' => [[static::class, 'validateToolbar']],
     ];
+
+    if (in_array('media', $settings['toolbar'] ?? [], TRUE) && !$this->mediaIsEmbeddable($editor)) {
+      $form['media_warning'] = [
+        '#type' => 'item',
+        '#markup' => $this->t('The media button is enabled, but media cannot be embedded in this text format. Install the Media Library module and enable the "Embed media" filter below, otherwise the button stays hidden.'),
+        '#weight' => 1,
+      ];
+    }
+
     return $form;
   }
 
@@ -97,6 +139,32 @@ class PortableText extends EditorBase {
   }
 
   /**
+   * Whether media can be embedded in this editor's text format.
+   *
+   * Media is rendered by core's "Embed media" filter, which also gates access
+   * to the media library for text editors, so without it there is nothing the
+   * media button could usefully do.
+   *
+   * @param mixed $editor
+   *   The text editor being configured, if there is one yet.
+   *
+   * @return bool
+   *   TRUE when the media library can be offered.
+   *
+   * @see \Drupal\media_library\MediaLibraryEditorOpener::checkAccess()
+   */
+  protected function mediaIsEmbeddable($editor): bool {
+    if (!$editor instanceof EditorEntity || !$this->moduleHandler->moduleExists('media_library')) {
+      return FALSE;
+    }
+    if (!$editor->hasAssociatedFilterFormat()) {
+      return FALSE;
+    }
+    $filters = $editor->getFilterFormat()->filters();
+    return $filters->has('media_embed') && $filters->get('media_embed')->status === TRUE;
+  }
+
+  /**
    * {@inheritdoc}
    */
   // phpcs:ignore Drupal.NamingConventions.ValidFunctionName.ScopeNotCamelCaps -- The name comes from EditorPluginInterface.
@@ -105,7 +173,64 @@ class PortableText extends EditorBase {
     // stale setting cannot make the JavaScript render an unknown button.
     $known = array_keys(static::toolbarButtons());
     $enabled = $editor->getSettings()['toolbar'] ?? [];
-    return ['toolbar' => array_values(array_intersect($known, $enabled))];
+    $settings = ['toolbar' => array_values(array_intersect($known, $enabled))];
+
+    if (in_array('media', $settings['toolbar'], TRUE) && $this->mediaIsEmbeddable($editor)) {
+      $settings['media'] = $this->mediaSettings($editor);
+    }
+    else {
+      // Without somewhere to embed media, the button would open a library the
+      // user cannot use.
+      $settings['toolbar'] = array_values(array_diff($settings['toolbar'], ['media']));
+    }
+
+    return $settings;
+  }
+
+  /**
+   * Builds the settings the media library button needs.
+   *
+   * @param \Drupal\editor\Entity\Editor $editor
+   *   The text editor.
+   *
+   * @return array
+   *   The URL of the media library dialog, and of the preview endpoint the
+   *   writing area renders embedded media with.
+   *
+   * @see \Drupal\ckeditor5\Plugin\CKEditor5Plugin\MediaLibrary::getDynamicPluginConfig()
+   */
+  protected function mediaSettings(EditorEntity $editor): array {
+    $format = $editor->getFilterFormat();
+    $media_type_ids = $this->entityTypeManager->getStorage('media_type')->getQuery()->execute();
+
+    $allowed = $format->filters()->get('media_embed')->settings['allowed_media_types'] ?? [];
+    if (!empty($allowed)) {
+      $media_type_ids = array_intersect_key($media_type_ids, $allowed);
+    }
+    if (in_array('image', $media_type_ids, TRUE)) {
+      // Images are what most people reach for, so offer that type first.
+      array_unshift($media_type_ids, 'image');
+      $media_type_ids = array_unique($media_type_ids);
+    }
+
+    $state = MediaLibraryState::create(
+      'media_library.opener.editor',
+      $media_type_ids,
+      reset($media_type_ids),
+      1,
+      ['filter_format_id' => $format->id()],
+    );
+
+    return [
+      'libraryUrl' => Url::fromRoute('media_library.ui')
+        ->setOption('query', $state->all())
+        ->toString(TRUE)
+        ->getGeneratedUrl(),
+      'previewUrl' => Url::fromRoute('media.filter.preview', ['filter_format' => $format->id()])
+        ->toString(TRUE)
+        ->getGeneratedUrl(),
+      'previewCsrfToken' => $this->csrfToken->get('X-Drupal-MediaPreview-CSRF-Token'),
+    ];
   }
 
   /**

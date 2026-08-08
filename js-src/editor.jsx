@@ -15,7 +15,8 @@ import {
   keyGenerator,
   useEditor,
 } from '@portabletext/editor';
-import { EventListenerPlugin } from '@portabletext/editor/plugins';
+import { BehaviorPlugin, EventListenerPlugin } from '@portabletext/editor/plugins';
+import { defineBehavior, execute, raise } from '@portabletext/editor/behaviors';
 import {
   getActiveStyle,
   getFocusSpan,
@@ -48,10 +49,18 @@ const schemaDefinition = defineSchema({
   annotations: [{ name: 'link', fields: [{ name: 'href', type: 'string' }] }],
   blockObjects: [
     {
+      name: 'media',
+      fields: [
+        { name: 'uuid', type: 'string' },
+        { name: 'viewMode', type: 'string' },
+      ],
+    },
+    {
       name: 'table',
       fields: [
         { name: 'rows', type: 'array' },
         { name: 'header', type: 'boolean' },
+        { name: 'widths', type: 'array' },
       ],
     },
   ],
@@ -152,6 +161,13 @@ const FACES = {
   table: (
     <Icon>
       <path d="M2 3h12v10H2zM2 6.5h12M2 10h12M6.5 6.5V13M10 6.5V13" {...stroke} />
+    </Icon>
+  ),
+  media: (
+    <Icon>
+      <path d="M2 3h12v10H2z" {...stroke} />
+      <circle cx="5.7" cy="6.3" r="1.1" fill="currentColor" />
+      <path d="m2 11 3.5-3 3 2.5L11 8l3 3" {...stroke} />
     </Icon>
   ),
 };
@@ -264,11 +280,69 @@ const BUTTONS = {
     label: Drupal.t('Insert table'),
     group: 'insert',
   },
+  media: {
+    label: Drupal.t('Insert media'),
+    group: 'insert',
+  },
   styles: {
     label: Drupal.t('Block style'),
     group: 'style',
   },
 };
+
+/**
+ * What typing a marker then a space turns the block into.
+ *
+ * Only the markers people already have in their fingers from writing
+ * markdown, and only at the very start of a block.
+ */
+const MARKDOWN = {
+  '##': { style: 'h2' },
+  '###': { style: 'h3' },
+  '####': { style: 'h4' },
+  '>': { style: 'blockquote' },
+  '-': { listItem: 'bullet' },
+  '*': { listItem: 'bullet' },
+  '1.': { listItem: 'number' },
+};
+
+/**
+ * Turns a markdown marker at the start of a block into real formatting.
+ *
+ * This is a behavior rather than a key handler because it has to run inside
+ * the editor's own pipeline: the space arrives faster than the model settles
+ * when someone types quickly, and a key handler would read a block that does
+ * not hold the marker yet.
+ */
+const markdownBehavior = defineBehavior({
+  on: 'insert.text',
+  guard: ({ snapshot, event }) => {
+    if (event.text !== ' ') {
+      return false;
+    }
+    const block = getFocusTextBlock(snapshot);
+    if (!block || block.node.listItem) {
+      return false;
+    }
+    // The whole block has to be the marker, which also means the caret is
+    // right after it, so where the caret is needs no asking about separately.
+    const marker = (block.node.children || []).map((child) => child.text || '').join('');
+    const rule = MARKDOWN[marker];
+    return rule ? { block, marker, rule } : false;
+  },
+  actions: [
+    (payload, { block, marker, rule }) => [
+      // Take the marker away, and the space with it, then format the block
+      // that is left.
+      ...Array.from({ length: marker.length }, () =>
+        raise({ type: 'delete.backward', unit: 'character' }),
+      ),
+      rule.style
+        ? raise({ type: 'block.set', at: block.path, props: { style: rule.style } })
+        : raise({ type: 'list item.toggle', listItem: rule.listItem }),
+    ],
+  ],
+});
 
 // What the block style menu offers, in the order it lists them.
 const STYLE_OPTIONS = [
@@ -351,7 +425,7 @@ function onToolbarKeyDown(event) {
   buttons[to].focus();
 }
 
-function ToolbarButton({ id, index }) {
+function ToolbarButton({ id, index, media }) {
   const editor = useEditor();
   const { label, shortcut, selector, event } = BUTTONS[id];
   const active = useEditorState(editor, selector || (() => false));
@@ -367,7 +441,16 @@ function ToolbarButton({ id, index }) {
       // Keep the selection in the editable while the button is used.
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
-        if (id === 'table') {
+        if (id === 'media') {
+          openMediaLibrary(media, (uuid) =>
+            editor.send({
+              type: 'insert.block',
+              block: { _type: 'media', uuid },
+              placement: 'auto',
+            }),
+          );
+        }
+        else if (id === 'table') {
           editor.send({
             type: 'insert.block',
             block: {
@@ -694,9 +777,49 @@ function TableBlock({ value, path }) {
   const rows = Array.isArray(value.rows) ? value.rows : [];
   const columns = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
   const header = value.header !== false;
+  // Widths are only used when there is one per column; adding or removing a
+  // column drops them rather than trying to guess what should give way.
+  const widths =
+    Array.isArray(value.widths) && value.widths.length === columns ? value.widths : null;
 
   const update = (props) => editor.send({ type: 'block.set', at: path, props });
   const setRows = (next) => update({ rows: next });
+
+  /**
+   * Drags the boundary between two columns.
+   *
+   * The columns are sized directly while dragging and only written to the
+   * document when the pointer is let go, so that a drag is one undo step
+   * rather than one per pixel.
+   */
+  const startResize = (event, index) => {
+    event.preventDefault();
+    const table = wrapper.current.querySelector('table');
+    const columnElements = table.querySelectorAll('col');
+    const total = table.getBoundingClientRect().width;
+    const from = event.clientX;
+    const starting = widths || Array.from({ length: columns }, () => 100 / columns);
+    const pair = starting[index] + starting[index + 1];
+    let next = starting;
+
+    const move = (moved) => {
+      const delta = ((moved.clientX - from) / total) * 100;
+      // Neither column may collapse to nothing.
+      const left = Math.max(6, Math.min(pair - 6, starting[index] + delta));
+      next = [...starting];
+      next[index] = Math.round(left * 10) / 10;
+      next[index + 1] = Math.round((pair - left) * 10) / 10;
+      columnElements[index].style.width = `${next[index]}%`;
+      columnElements[index + 1].style.width = `${next[index + 1]}%`;
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      update({ widths: next });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+  };
   const blank = (length) => Array.from({ length }, () => '');
 
   // Every control works from the cell that was last used, the way a word
@@ -708,7 +831,10 @@ function TableBlock({ value, path }) {
   };
   const insertColumn = (offset) => {
     const index = at.column + offset;
-    setRows(rows.map((row) => [...row.slice(0, index), '', ...row.slice(index)]));
+    update({
+      rows: rows.map((row) => [...row.slice(0, index), '', ...row.slice(index)]),
+      widths: null,
+    });
     requestAnimationFrame(() => focusCell(wrapper.current, at.row, index));
   };
   const removeRow = () => {
@@ -716,7 +842,10 @@ function TableBlock({ value, path }) {
     requestAnimationFrame(() => focusCell(wrapper.current, Math.max(0, at.row - 1), at.column));
   };
   const removeColumn = () => {
-    setRows(rows.map((row) => row.filter((cell, index) => index !== at.column)));
+    update({
+      rows: rows.map((row) => row.filter((cell, index) => index !== at.column)),
+      widths: null,
+    });
     requestAnimationFrame(() =>
       focusCell(wrapper.current, at.row, Math.max(0, at.column - 1)),
     );
@@ -788,6 +917,12 @@ function TableBlock({ value, path }) {
       }}
     >
       <table>
+        <colgroup>
+          {Array.from({ length: columns }, (ignored, index) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <col key={index} style={widths ? { width: `${widths[index]}%` } : undefined} />
+          ))}
+        </colgroup>
         <tbody>
           {rows.map((row, rowIndex) => (
             // eslint-disable-next-line react/no-array-index-key
@@ -805,6 +940,16 @@ function TableBlock({ value, path }) {
                         : undefined
                     }
                   >
+                    {rowIndex === 0 && columnIndex < columns - 1 ? (
+                      <span
+                        className="portable-text-editor__resize"
+                        role="separator"
+                        aria-label={Drupal.t('Resize column @column', {
+                          '@column': columnIndex + 1,
+                        })}
+                        onPointerDown={(down) => startResize(down, columnIndex)}
+                      />
+                    ) : null}
                     <TableCell
                       row={rowIndex}
                       column={columnIndex}
@@ -879,11 +1024,129 @@ function TableBlock({ value, path }) {
   );
 }
 
-function renderBlock(props) {
-  if (props.value._type === 'table') {
-    return <TableBlock value={props.value} path={props.path} />;
-  }
-  return props.children;
+/**
+ * Opens Drupal's media library and reports back what was chosen.
+ *
+ * The library is Drupal's own dialog, so what it can offer, and to whom, is
+ * decided by Drupal rather than here.
+ *
+ * @param {object} media
+ *   The media settings from the Editor plugin.
+ * @param {Function} onSelect
+ *   Called with the chosen media's UUID.
+ *
+ * @see \Drupal\media_library\MediaLibraryEditorOpener
+ */
+function openMediaLibrary(media, onSelect) {
+  // The library reports its choice through this event, which is how core's
+  // own editors receive it too.
+  const received = (event, values) => {
+    jQuery(window).off('editor:dialogsave', received);
+    const uuid = values?.attributes?.['data-entity-uuid'];
+    if (uuid) {
+      onSelect(uuid);
+    }
+  };
+  jQuery(window).on('editor:dialogsave', received);
+
+  Drupal.ajax({
+    url: media.libraryUrl,
+    dialog: {
+      title: Drupal.t('Add or select media'),
+      width: 'auto',
+      classes: { 'ui-dialog': 'ui-dialog--narrow' },
+    },
+    dialogType: 'modal',
+    selector: '.portable-text-editor-media-loading',
+    progress: { type: 'fullscreen' },
+    submit: { editor_object: {} },
+  }).execute();
+}
+
+/**
+ * An embedded media item, shown as Drupal renders it.
+ */
+function MediaBlock({ value, path, media }) {
+  const editor = useEditor();
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    let current = true;
+    const element = `<drupal-media data-entity-type="media" data-entity-uuid="${value.uuid}"></drupal-media>`;
+    fetch(`${media.previewUrl}?${new URLSearchParams({ text: element, uuid: value.uuid })}`, {
+      headers: { 'X-Drupal-MediaPreview-CSRF-Token': media.previewCsrfToken },
+    })
+      .then((response) => (response.ok ? response.text() : Promise.reject(response.status)))
+      .then((html) => {
+        if (current) {
+          setPreview({ html });
+        }
+      })
+      .catch(() => {
+        if (current) {
+          setPreview({ failed: true });
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [value.uuid, media.previewUrl, media.previewCsrfToken]);
+
+  return (
+    <div className="portable-text-editor__media" contentEditable={false}>
+      {preview === null ? (
+        <p className="portable-text-editor__media-message">{Drupal.t('Loading media…')}</p>
+      ) : null}
+      {preview?.failed ? (
+        <p className="portable-text-editor__media-message">
+          {Drupal.t('This media could not be shown. It may have been deleted.')}
+        </p>
+      ) : null}
+      {preview?.html !== undefined ? (
+        // Drupal rendered this, for this text format and this user, through
+        // its own media pipeline. It is markup on purpose.
+        // eslint-disable-next-line react/no-danger
+        <div dangerouslySetInnerHTML={{ __html: preview.html }} />
+      ) : null}
+      <div className="portable-text-editor__media-actions">
+        <button
+          type="button"
+          onClick={() =>
+            openMediaLibrary(media, (uuid) =>
+              editor.send({ type: 'block.set', at: path, props: { uuid } }),
+            )
+          }
+        >
+          {Drupal.t('Replace media')}
+        </button>
+        <button type="button" onClick={() => editor.send({ type: 'delete.block', at: path })}>
+          {Drupal.t('Remove media')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function buildRenderBlock(media) {
+  return function renderBlock(props) {
+    if (props.value._type === 'table') {
+      return <TableBlock value={props.value} path={props.path} />;
+    }
+    if (props.value._type === 'media') {
+      return media ? (
+        <MediaBlock value={props.value} path={props.path} media={media} />
+      ) : (
+        // The format no longer embeds media, so say so rather than showing an
+        // empty space that hides content which is still stored.
+        <div className="portable-text-editor__media" contentEditable={false}>
+          <p className="portable-text-editor__media-message">
+            {Drupal.t('Embedded media, which this text format can no longer show.')}
+          </p>
+        </div>
+      );
+    }
+    return props.children;
+  };
 }
 
 function renderAnnotation(props) {
@@ -908,7 +1171,38 @@ function ValueBridge({ onReady }) {
   return null;
 }
 
-function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onReady, onValue }) {
+// Stable, so the plugin does not unregister and register on every render.
+const BEHAVIORS = [markdownBehavior];
+
+/**
+ * The writing area itself, inside the provider so that it can reach the
+ * editor, which the markdown rules and the link shortcut both need.
+ */
+function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink }) {
+  return (
+    <PortableTextEditable
+      className="portable-text-editor__editable"
+      style={{ minHeight: `${Math.max(rows, 3) * 1.7}em` }}
+      aria-label={ariaLabel}
+      renderStyle={renderStyle}
+      renderDecorator={renderDecorator}
+      renderAnnotation={renderAnnotation}
+      renderBlock={buildRenderBlock(media)}
+      renderPlaceholder={() => (
+        <span className="portable-text-editor__placeholder">{placeholder}</span>
+      )}
+      onKeyDown={(event) => {
+        if (hasLink && event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          onOpenLink();
+          return;
+        }
+      }}
+    />
+  );
+}
+
+function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, onReady, onValue }) {
   const [linkOpen, setLinkOpen] = useState(false);
   // Config can outlive a button, so anything unknown here is dropped.
   const buttons = toolbar.filter((id) => BUTTONS[id]);
@@ -917,6 +1211,7 @@ function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onReady, 
   return (
     <EditorProvider initialConfig={{ schemaDefinition, initialValue }}>
       <ValueBridge onReady={onReady} />
+      <BehaviorPlugin behaviors={BEHAVIORS} />
       <EventListenerPlugin
         on={(event) => {
           if (event.type === 'mutation') {
@@ -939,28 +1234,20 @@ function Editor({ toolbar, initialValue, ariaLabel, placeholder, rows, onReady, 
             {id === 'link' ? (
               <LinkButton index={index} open={linkOpen} onOpen={() => setLinkOpen(true)} />
             ) : null}
-            {id !== 'styles' && id !== 'link' ? <ToolbarButton id={id} index={index} /> : null}
+            {id !== 'styles' && id !== 'link' ? (
+              <ToolbarButton id={id} index={index} media={media} />
+            ) : null}
           </Fragment>
         ))}
       </div>
       {linkOpen ? <LinkForm onClose={() => setLinkOpen(false)} /> : null}
-      <PortableTextEditable
-        className="portable-text-editor__editable"
-        style={{ minHeight: `${Math.max(rows, 3) * 1.7}em` }}
-        aria-label={ariaLabel}
-        renderStyle={renderStyle}
-        renderDecorator={renderDecorator}
-        renderAnnotation={renderAnnotation}
-        renderBlock={renderBlock}
-        renderPlaceholder={() => (
-          <span className="portable-text-editor__placeholder">{placeholder}</span>
-        )}
-        onKeyDown={(event) => {
-          if (hasLink && event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            setLinkOpen(true);
-          }
-        }}
+      <Editable
+        media={media}
+        ariaLabel={ariaLabel}
+        placeholder={placeholder}
+        rows={rows}
+        hasLink={hasLink}
+        onOpenLink={() => setLinkOpen(true)}
       />
     </EditorProvider>
   );
@@ -1074,6 +1361,7 @@ Drupal.editors.portable_text = {
       <StrictMode>
         <Editor
           toolbar={format.editorSettings.toolbar}
+          media={format.editorSettings.media}
           initialValue={parseValue(element.value)}
           ariaLabel={label ? label.textContent.trim() : Drupal.t('Rich text editor')}
           onReady={(editor) => {

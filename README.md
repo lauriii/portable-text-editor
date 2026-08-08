@@ -88,8 +88,26 @@ dividers appear between the groups.
   passing through every button.
 - **The toolbar follows a long field**, sticking below Drupal's own toolbar
   rather than scrolling out of reach.
+- **Media.** The media button opens Drupal's own media library, so what it
+  offers, and to whom, is Drupal's decision rather than this module's. A
+  chosen item is stored as a media block holding its UUID, and the writing
+  area shows it as Drupal renders it, through core's media preview endpoint.
+  On output the filter emits the `<drupal-media>` element that core's "Embed
+  media" filter reads, so media is rendered with its own access checking, view
+  modes and cache metadata. That filter has to be enabled on the format: it is
+  also what gates access to the library for text editors, so without it the
+  button hides itself and the editor settings form says why.
+- **Markdown shortcuts.** Typing `## `, `### `, `#### `, `> `, `- `, `* ` or
+  `1. ` at the start of a block turns it into that heading, quote or list. It
+  is an editor behavior rather than a key handler, because a key handler reads
+  a block that does not hold the marker yet when someone types quickly.
 - **Tables.** A table is a Portable Text block object holding rows of text,
   edited as a grid:
+  - Columns can be resized by dragging the boundary between two of them. The
+    drag sizes the columns directly and is written to the document once, on
+    release, so it is one undo step rather than one per pixel. Widths are
+    rendered as a `colgroup`, and are dropped when a column is added or
+    removed rather than guessing which column should give way.
   - Cells grow as they are written in and hold several lines. A line break is
     rendered as `<br>`, after the text has been escaped.
   - Tab and Shift+Tab move between cells, and Tab past the last cell adds a
@@ -123,11 +141,11 @@ dividers appear between the groups.
   failed to load, the textarea is handed back after three seconds rather than
   leaving an invisible field behind.
 
-Not included: markdown-style input rules such as typing `## ` for a heading,
-images and other block objects, formatting inside table cells, and code blocks
-(`pre`), which would need whitespace preservation that a Portable Text text
-block does not offer. Pasted HTML tables are still flattened to paragraphs:
-the deserializer does not know about this module's table block.
+Not included: formatting inside table cells, which needs an editor per cell;
+merging cells and selecting across them; code blocks (`pre`), which need
+whitespace preservation that a Portable Text text block does not offer; and
+pasted HTML tables, which are still flattened to paragraphs because the
+deserializer does not know about this module's table block.
 
 ## Requirements
 

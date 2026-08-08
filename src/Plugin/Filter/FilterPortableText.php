@@ -89,9 +89,24 @@ class FilterPortableText extends FilterBase {
 
     $decoded = json_decode($text, TRUE);
     if ($decoded === NULL && json_last_error() !== JSON_ERROR_NONE) {
-      // Not JSON at all. This happens when a field was authored in another
-      // text format and then switched over, so keep the text rather than
-      // discarding it. Escaping makes any markup in it inert.
+      // Core's media preview endpoint renders one bare embed element through
+      // this text format, which is how the writing area shows media the way a
+      // visitor will see it. That element is read and built again below rather
+      // than passed along, so nothing from the input reaches the output, and
+      // it grants nothing new either: a media block emits the same element.
+      // @see \Drupal\media\Controller\MediaFilterController::preview()
+      if (preg_match('#^<drupal-media\b([^>]*)></drupal-media>$#i', $text, $element)) {
+        preg_match('#data-entity-uuid="([^"]*)"#i', $element[1], $uuid);
+        preg_match('#data-view-mode="([^"]*)"#i', $element[1], $view_mode);
+        return $this->renderMedia([
+          'uuid' => $uuid[1] ?? NULL,
+          'viewMode' => $view_mode[1] ?? NULL,
+        ]);
+      }
+
+      // Otherwise this is not JSON at all, which is what a field looks like
+      // after being authored in another text format, so keep the text rather
+      // than discarding it. Escaping makes any markup in it inert.
       return '<p>' . Html::escape($text) . '</p>';
     }
     if (!is_array($decoded) || !array_is_list($decoded)) {
@@ -109,6 +124,11 @@ class FilterPortableText extends FilterBase {
 
     foreach ($decoded as $block) {
       if (!is_array($block)) {
+        continue;
+      }
+      if (($block['_type'] ?? NULL) === 'media') {
+        $output .= $this->closeLists($lists, $item_open, 0);
+        $output .= $this->renderMedia($block);
         continue;
       }
       if (($block['_type'] ?? NULL) === 'table') {
@@ -162,6 +182,37 @@ class FilterPortableText extends FilterBase {
   }
 
   /**
+   * Renders an embedded media item.
+   *
+   * The markup is what core's "Embed media" filter reads, so that media is
+   * rendered by Drupal in the usual way, with its own access checking, view
+   * modes and cache metadata, rather than by anything invented here. That
+   * filter runs after this one, and without it the element renders as nothing.
+   *
+   * @param array $block
+   *   A decoded media block.
+   *
+   * @return string
+   *   The embed element, or an empty string when there is no media to embed.
+   *
+   * @see \Drupal\media\Plugin\Filter\MediaEmbed
+   */
+  protected function renderMedia(array $block): string {
+    $uuid = $block['uuid'] ?? NULL;
+    // A UUID is the only thing that identifies the media, so anything that is
+    // not one is not worth emitting an element for.
+    if (!is_string($uuid) || !preg_match('/^[0-9a-f-]{36}$/i', $uuid)) {
+      return '';
+    }
+
+    $element = '<drupal-media data-entity-type="media" data-entity-uuid="' . Html::escape($uuid) . '"';
+    if (is_string($block['viewMode'] ?? NULL) && $block['viewMode'] !== '') {
+      $element .= ' data-view-mode="' . Html::escape($block['viewMode']) . '"';
+    }
+    return $element . '></drupal-media>';
+  }
+
+  /**
    * Renders a table block.
    *
    * Cells hold plain text, which is what the editor can produce, so every cell
@@ -180,6 +231,12 @@ class FilterPortableText extends FilterBase {
     }
 
     $header = ($block['header'] ?? FALSE) === TRUE;
+    $columns = 0;
+    foreach ($rows as $row) {
+      if (is_array($row)) {
+        $columns = max($columns, count($row));
+      }
+    }
     $rendered = [];
     foreach ($rows as $row) {
       if (!is_array($row) || !array_is_list($row) || $row === []) {
@@ -200,12 +257,40 @@ class FilterPortableText extends FilterBase {
       return '';
     }
 
+    $group = $this->renderColumnWidths($block['widths'] ?? NULL, $columns);
     if (!$header) {
-      return '<table><tbody>' . implode('', $rendered) . '</tbody></table>';
+      return '<table>' . $group . '<tbody>' . implode('', $rendered) . '</tbody></table>';
     }
     $head = array_shift($rendered);
     $body = $rendered === [] ? '' : '<tbody>' . implode('', $rendered) . '</tbody>';
-    return '<table><thead>' . $head . '</thead>' . $body . '</table>';
+    return '<table>' . $group . '<thead>' . $head . '</thead>' . $body . '</table>';
+  }
+
+  /**
+   * Renders the column widths a table was given in the editor.
+   *
+   * @param mixed $widths
+   *   The stored widths, as percentages.
+   * @param int $columns
+   *   How many columns the table has.
+   *
+   * @return string
+   *   A colgroup, or an empty string when the widths cannot be used.
+   */
+  protected function renderColumnWidths($widths, int $columns): string {
+    if (!is_array($widths) || !array_is_list($widths) || count($widths) !== $columns || $columns === 0) {
+      return '';
+    }
+
+    $group = '';
+    foreach ($widths as $width) {
+      if (!is_numeric($width) || $width <= 0 || $width >= 100) {
+        return '';
+      }
+      // Built from a number, so the style attribute holds nothing but one.
+      $group .= '<col style="width:' . round((float) $width, 1) . '%">';
+    }
+    return '<colgroup>' . $group . '</colgroup>';
   }
 
   /**

@@ -25,5 +25,6 @@ settings:
     - numbered_list
     - link
     - table
+    - media
 image_upload:
   status: false

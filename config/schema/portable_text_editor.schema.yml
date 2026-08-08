@@ -32,6 +32,7 @@ editor.settings.portable_text:
               - numbered_list
               - link
               - table
+              - media
 
 filter_settings.filter_portable_text:
   type: mapping
