@@ -7,14 +7,14 @@
  * honest when a text format has buttons turned off.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
 import { getApplicableSchema, getFocusTextBlock } from '@portabletext/editor/selectors';
 import { useEditorState } from './editor-state.js';
 import { NEW_TABLE_ROWS, NEW_TABLE_COLUMNS } from './schema.jsx';
 import { emptyRows } from './table.jsx';
 import { openMediaLibrary } from './media.jsx';
-import { anchorBelow, caretRect } from './anchor.js';
+import { useAnchor } from './anchor.js';
 
 /**
  * What the menu can insert.
@@ -115,7 +115,7 @@ function readMarker(snapshot) {
 /**
  * The insert menu, anchored to the caret.
  */
-function SlashMenu({ media }) {
+function SlashMenu({ media, onState }) {
   const editor = useEditor();
   const schema = useEditorState(editor, getApplicableSchema);
   const marker = useEditorState(editor, readMarker);
@@ -123,6 +123,8 @@ function SlashMenu({ media }) {
   // ordinary text rather than reopening on the next keystroke.
   const [dismissed, setDismissed] = useState(null);
   const [index, setIndex] = useState(0);
+  const [menu, style] = useAnchor(editor, [marker?.query, marker?.block?.node?._key]);
+  const listId = useId();
 
   const matches = marker
     ? ITEMS.filter(
@@ -179,22 +181,40 @@ function SlashMenu({ media }) {
     return () => element.removeEventListener('keydown', onKeyDown, true);
   }, [editor]);
 
+  const chosen = open ? index % matches.length : 0;
+
+  // The writing area keeps the focus, so it is the thing that has to tell a
+  // screen reader that a menu is open and which item is highlighted.
+  useEffect(() => {
+    onState(open ? { listId, activeId: `${listId}-${chosen}` } : null);
+  }, [open, chosen, listId, onState]);
+
   if (!open) {
     return null;
   }
 
-  const chosen = index % matches.length;
-
   return (
+    // A listbox, because the focus stays in the writing area while the arrow
+    // keys move a highlight in here. Without the roles and the active
+    // descendant below, none of that reached a screen reader: no announcement
+    // that a menu had opened, no reading of the highlighted item, and arrow
+    // keys that appeared to do nothing at all because they are also kept from
+    // moving the caret.
     <ul
       className="portable-text-editor__slash"
-      style={anchorBelow(editor, caretRect(editor))}
+      ref={menu}
+      style={style}
+      id={listId}
+      role="listbox"
+      aria-label={Drupal.t('Insert')}
     >
       {matches.map((item, position) => (
-        <li key={item.label}>
+        <li key={item.label} role="presentation">
           <button
             type="button"
-            aria-current={position === chosen}
+            id={`${listId}-${position}`}
+            role="option"
+            aria-selected={position === chosen}
             // The editable keeps the focus, so the caret stays where it is.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => choose(item)}

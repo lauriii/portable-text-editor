@@ -11,7 +11,7 @@ import { useId, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
 import { getFocusSpan, getFocusTextBlock } from '@portabletext/editor/selectors';
 import { useEditorState } from './editor-state.js';
-import { anchorBelow, caretRect } from './anchor.js';
+import { useAnchor } from './anchor.js';
 
 /**
  * The link the caret is in, if it is in one.
@@ -44,12 +44,37 @@ function activeLink(snapshot) {
     // mark definition's key.
     at: [...block.path, 'markDefs', { _key: link._key }],
     // Removing needs a selection covering the link rather than a path, and the
-    // caret alone does not qualify.
-    // ponytail: the focused span is the whole link unless a decorator splits
-    // it; widen this to the neighbouring spans if that ever matters.
-    range: {
-      anchor: { path: span.path, offset: 0 },
-      focus: { path: span.path, offset: (span.node.text || '').length },
+    // caret alone does not qualify. It has to cover every span the link is on,
+    // not just the one the caret is in: a link is one mark definition but as
+    // many spans as the formatting inside it splits it into, so unlinking from
+    // the focused span alone left the rest of it linked.
+    range: spanning(block, link._key),
+  };
+}
+
+/**
+ * A range covering every span a mark definition is applied to.
+ *
+ * @param {object} block
+ *   The focused block, as the selector reports it.
+ * @param {string} key
+ *   The mark definition's key.
+ *
+ * @return {object}
+ *   A range from the start of the first span carrying the mark to the end of
+ *   the last one.
+ */
+function spanning(block, key) {
+  const children = block.node.children || [];
+  const carries = (child) => (child.marks || []).includes(key);
+  const first = children.findIndex(carries);
+  const last = children.findLastIndex(carries);
+  const pathTo = (child) => [...block.path, 'children', { _key: child._key }];
+  return {
+    anchor: { path: pathTo(children[first]), offset: 0 },
+    focus: {
+      path: pathTo(children[last]),
+      offset: (children[last].text || '').length,
     },
   };
 }
@@ -106,6 +131,7 @@ function LinkBalloon({ request, onClose }) {
   // What has been typed into the URL field, or null while nothing has been.
   const [draft, setDraft] = useState(null);
   const fieldId = useId();
+  const [balloon, style] = useAnchor(editor, [target?.href, request, draft]);
 
   // Being asked to edit is enough to show the field: waiting for an effect to
   // set the draft would leave one render showing the other branch, which has
@@ -156,11 +182,9 @@ function LinkBalloon({ request, onClose }) {
     return null;
   }
 
-  const style = anchorBelow(editor, caretRect(editor));
-
   if (editing) {
     return (
-      <div className="portable-text-editor__balloon" style={style}>
+      <div className="portable-text-editor__balloon" ref={balloon} style={style}>
         <label className="portable-text-editor__link-label" htmlFor={fieldId}>
           {Drupal.t('URL')}
         </label>
@@ -195,7 +219,7 @@ function LinkBalloon({ request, onClose }) {
   }
 
   return (
-    <div className="portable-text-editor__balloon" style={style}>
+    <div className="portable-text-editor__balloon" ref={balloon} style={style}>
       <a
         className="portable-text-editor__link-shown"
         href={target.href}

@@ -178,7 +178,15 @@ function MediaBlock({ value, path, media }) {
       className={`portable-text-editor__media${active ? ' portable-text-editor__media--active' : ''}`}
       contentEditable={false}
       tabIndex={0}
-      aria-label={Drupal.t('Embedded media')}
+      // A group rather than a bare div: ARIA does not allow a name on a
+      // generic element, so screen readers were within their rights to drop
+      // "Embedded media" and announce nothing at all here.
+      role="group"
+      aria-label={
+        value.alt
+          ? Drupal.t('Embedded media: @alt', { '@alt': value.alt })
+          : Drupal.t('Embedded media')
+      }
       onFocus={() => setActive(true)}
       onKeyDown={(event) => {
         // Only when the media itself has the focus, so that a backspace in the
@@ -225,8 +233,8 @@ function MediaBlock({ value, path, media }) {
       ) : null}
       {active && alt === null ? (
         <div className="portable-text-editor__balloon" role="toolbar" aria-label={Drupal.t('Media')}>
-          <button type="button" onClick={() => setAlt(value.alt || '')}>
-            {value.alt ? Drupal.t('Alt text: @alt', { '@alt': value.alt }) : Drupal.t('Add alt text')}
+          <button type="button" title={value.alt || undefined} onClick={() => setAlt(value.alt || '')}>
+            {value.alt ? Drupal.t('Edit alt text') : Drupal.t('Add alt text')}
           </button>
           <span className="portable-text-editor__divider" />
           <button

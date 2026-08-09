@@ -252,12 +252,15 @@ class FilterPortableText extends FilterBase {
       }
       // The first row is only a header row when the block says so.
       $tag = $header && $rendered === [] ? 'th' : 'td';
+      // A header cell says which way it heads, so that a screen reader can
+      // tie a cell to the heading above it.
+      $open = $tag === 'th' ? '<th scope="col">' : '<td>';
       $cells = '';
       foreach ($row as $cell) {
         // Cells may hold several lines, which only survive as markup. Escaping
         // first means the <br> tags are the only ones that can be there.
         $text = is_string($cell) ? nl2br(Html::escape($cell), FALSE) : '';
-        $cells .= '<' . $tag . '>' . $text . '</' . $tag . '>';
+        $cells .= $open . $text . '</' . $tag . '>';
       }
       $rendered[] = '<tr>' . $cells . '</tr>';
     }
@@ -266,12 +269,17 @@ class FilterPortableText extends FilterBase {
     }
 
     $group = $this->renderColumnWidths($block['widths'] ?? NULL, $columns);
+    // Column widths are percentages, and a percentage of nothing is nothing:
+    // with no width on the table itself it shrinks to fit its text, and the
+    // proportions the author dragged out are thrown away. A table 197 pixels
+    // wide in a 1280 pixel page was the result.
+    $open = $group === '' ? '<table>' : '<table style="width:100%">';
     if (!$header) {
-      return '<table>' . $group . '<tbody>' . implode('', $rendered) . '</tbody></table>';
+      return $open . $group . '<tbody>' . implode('', $rendered) . '</tbody></table>';
     }
     $head = array_shift($rendered);
     $body = $rendered === [] ? '' : '<tbody>' . implode('', $rendered) . '</tbody>';
-    return '<table>' . $group . '<thead>' . $head . '</thead>' . $body . '</table>';
+    return $open . $group . '<thead>' . $head . '</thead>' . $body . '</table>';
   }
 
   /**

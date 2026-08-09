@@ -268,7 +268,7 @@ class FilterPortableTextTest extends KernelTestBase {
             'rows' => [['A', 'B']],
           ],
         ],
-        '<table><colgroup><col style="width:30%"><col style="width:70%"></colgroup><tbody><tr><td>A</td><td>B</td></tr></tbody></table>',
+        '<table style="width:100%"><colgroup><col style="width:30%"><col style="width:70%"></colgroup><tbody><tr><td>A</td><td>B</td></tr></tbody></table>',
       ],
       'unusable column widths are dropped' => [
         [
@@ -291,7 +291,7 @@ class FilterPortableTextTest extends KernelTestBase {
             'rows' => [['A', 'B'], ['1', '2']],
           ],
         ],
-        '<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>',
+        '<table><thead><tr><th scope="col">A</th><th scope="col">B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>',
       ],
       'table without a header row' => [
         [
@@ -306,7 +306,7 @@ class FilterPortableTextTest extends KernelTestBase {
       ],
       'a header-only table has no body' => [
         [['_type' => 'table', '_key' => 't1', 'header' => TRUE, 'rows' => [['A']]]],
-        '<table><thead><tr><th>A</th></tr></thead></table>',
+        '<table><thead><tr><th scope="col">A</th></tr></thead></table>',
       ],
       'table cells are escaped' => [
         [

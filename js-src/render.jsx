@@ -30,10 +30,19 @@ function buildRenderBlock(media) {
 
 function renderAnnotation(props) {
   if (props.schemaType.name === 'link') {
+    // A real anchor, so that a screen reader can find the links in the text
+    // being written. As a span they were only a colour and an underline, which
+    // is to say invisible to anyone not looking at them.
     return (
-      <span className="portable-text-editor__link" title={props.value.href}>
+      <a
+        className="portable-text-editor__link"
+        href={props.value.href}
+        title={props.value.href}
+        // The caret belongs here, not the browser's follow-the-link handling.
+        onClick={(event) => event.preventDefault()}
+      >
         {props.children}
-      </span>
+      </a>
     );
   }
   return props.children;

@@ -181,6 +181,50 @@ function TableBlock({ value, path }) {
   };
 
   /**
+   * Moves to a cell, or out of the table when the edge has been reached.
+   *
+   * Every arrow key used to be consumed whether or not there was a cell to
+   * move to, so at the edges nothing happened and the caret could not get out
+   * of the table at all.
+   *
+   * @param {HTMLElement} element
+   *   The cell the caret is leaving.
+   * @param {number} row
+   *   The row being moved to.
+   * @param {number} column
+   *   The column being moved to.
+   * @param {string} side
+   *   Which side of the table to place the caret on when leaving it.
+   */
+  const moveOrLeave = (element, row, column, side) => {
+    const cell = wrapper.current.querySelector(`[data-row="${row}"][data-column="${column}"]`);
+    if (cell) {
+      focusCell(wrapper.current, row, column);
+      return;
+    }
+    element.blur();
+    editor.send({ type: 'focus' });
+
+    // The text block on that side of the table, if the document has one.
+    const blocks = editor.getSnapshot().context.value || [];
+    const here = blocks.findIndex((block) => block._key === path[0]?._key);
+    const target = blocks[here + (side === 'before' ? -1 : 1)];
+    const span = target?.children?.[side === 'before' ? target.children.length - 1 : 0];
+    if (!span) {
+      return;
+    }
+    // Coming from above the table the caret goes to the end of the block
+    // before it, and from below to the start of the block after, which is
+    // where it would have arrived had the table not been in the way.
+    const offset = side === 'before' ? (span.text || '').length : 0;
+    const at = [{ _key: target._key }, 'children', { _key: span._key }];
+    editor.send({
+      type: 'select',
+      at: { anchor: { path: at, offset }, focus: { path: at, offset } },
+    });
+  };
+
+  /**
    * Keeps the caret moving the way it does in a spreadsheet.
    */
   const onCellKeyDown = (event, row, column) => {
@@ -213,8 +257,21 @@ function TableBlock({ value, path }) {
       focusCell(wrapper.current, Math.floor(flat / columns), flat % columns);
       return;
     }
+    // Undo and redo belong to the document, not to this field. The textarea
+    // handles them itself otherwise, and its own history knows nothing about
+    // the table, so the shortcut did nothing at all inside a cell while the
+    // toolbar button worked.
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      editor.send({ type: event.shiftKey ? 'history.redo' : 'history.undo' });
+      return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
+      // Blurring first, because asking the editor for the focus does not take
+      // it away from a textarea that still has it, which left Escape doing
+      // nothing and the caret stuck in the table.
+      element.blur();
       editor.send({ type: 'focus' });
       return;
     }
@@ -222,21 +279,21 @@ function TableBlock({ value, path }) {
     // cell holding several lines can still be moved around in.
     if (event.key === 'ArrowUp' && !element.value.slice(0, element.selectionStart).includes('\n')) {
       event.preventDefault();
-      focusCell(wrapper.current, row - 1, column);
+      moveOrLeave(element, row - 1, column, 'before');
       return;
     }
     if (event.key === 'ArrowDown' && !element.value.slice(element.selectionEnd).includes('\n')) {
       event.preventDefault();
-      focusCell(wrapper.current, row + 1, column);
+      moveOrLeave(element, row + 1, column, 'after');
       return;
     }
     if (event.key === 'ArrowLeft' && atStart) {
       event.preventDefault();
-      focusCell(wrapper.current, row, column - 1);
+      moveOrLeave(element, row, column - 1, 'before');
     }
     if (event.key === 'ArrowRight' && atEnd) {
       event.preventDefault();
-      focusCell(wrapper.current, row, column + 1);
+      moveOrLeave(element, row, column + 1, 'after');
     }
   };
 

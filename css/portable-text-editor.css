@@ -286,6 +286,18 @@ html.js
   outline: none;
 }
 
+/*
+ * The media's own controls sit inside the bottom of the picture rather than
+ * under it. Under it they covered the block that followed, and because they
+ * are a child of the media the pointer never left it, so they stayed up and
+ * swallowed clicks meant for the text underneath.
+ */
+.portable-text-editor__media > .portable-text-editor__balloon {
+  top: auto;
+  bottom: 4px;
+  margin-top: 0;
+}
+
 .portable-text-editor__media img,
 .portable-text-editor__media video,
 .portable-text-editor__media iframe {
@@ -417,6 +429,10 @@ html.js
   border-radius: 4px;
   background: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+  /* Never wider than what it belongs to. A long piece of alternative text used
+     as a button label grew this to 1706 pixels and gave the whole page a
+     horizontal scrollbar, with Replace and Remove somewhere off the side. */
+  max-width: 100%;
 }
 
 .portable-text-editor__link-label {
@@ -497,6 +513,10 @@ html.js
   border-radius: 4px;
   background: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+  /* Never wider than what it belongs to. A long piece of alternative text used
+     as a button label grew this to 1706 pixels and gave the whole page a
+     horizontal scrollbar, with Replace and Remove somewhere off the side. */
+  max-width: 100%;
   list-style: none;
 }
 

@@ -29,6 +29,31 @@ import { parseValue, serializeValue } from './value.js';
 const BEHAVIORS = [markdownBehavior, tabBehavior];
 
 /**
+ * The field's name, taken from its label.
+ *
+ * Only the label's own text: Claro puts an "Edit summary" button inside the
+ * body field's label, and taking all of the text made every screen reader
+ * announce the writing area as "Body (Edit summary)".
+ *
+ * @param {HTMLElement|null} label
+ *   The field's label, if it has one.
+ *
+ * @return {string}
+ *   What to call the writing area.
+ */
+function labelText(label) {
+  if (!label) {
+    return Drupal.t('Rich text editor');
+  }
+  const own = Array.from(label.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.nodeValue)
+    .join('')
+    .trim();
+  return own || label.textContent.trim();
+}
+
+/**
  * Hands the editor to the code outside React, which needs to read its value.
  */
 function ValueBridge({ onReady }) {
@@ -43,7 +68,7 @@ function ValueBridge({ onReady }) {
  * The writing area itself, inside the provider so that it can reach the
  * editor, which the link shortcut needs.
  */
-function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink }) {
+function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink, insert }) {
   const editor = useEditor();
 
   return (
@@ -51,6 +76,12 @@ function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink }) 
       className="portable-text-editor__editable"
       style={{ minHeight: `${Math.max(rows, 3) * 1.7}em` }}
       aria-label={ariaLabel}
+      // What the "/" menu is doing, which a screen reader cannot see from
+      // here otherwise: the focus never leaves this element while the menu is
+      // open and the arrow keys move a highlight inside it.
+      aria-expanded={insert ? true : undefined}
+      aria-controls={insert?.listId}
+      aria-activedescendant={insert?.activeId}
       renderStyle={renderStyle}
       renderDecorator={renderDecorator}
       renderAnnotation={renderAnnotation}
@@ -85,6 +116,8 @@ function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, on
   // Null unless the toolbar or the shortcut asked to edit a link, in which
   // case it carries the range the link should go on.
   const [link, setLink] = useState(null);
+  // What the "/" menu is showing, so the writing area can announce it.
+  const [insert, setInsert] = useState(null);
 
   return (
     <EditorProvider initialConfig={{ schemaDefinition, initialValue }}>
@@ -106,7 +139,7 @@ function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, on
       {toolbar.includes('link') ? (
         <LinkBalloon request={link} onClose={() => setLink(null)} />
       ) : null}
-      <SlashMenu media={media} />
+      <SlashMenu media={media} onState={setInsert} />
       <Editable
         media={media}
         ariaLabel={ariaLabel}
@@ -114,6 +147,7 @@ function Editor({ toolbar, media, initialValue, ariaLabel, placeholder, rows, on
         rows={rows}
         hasLink={toolbar.includes('link')}
         onOpenLink={(at) => setLink({ at })}
+        insert={insert}
       />
     </EditorProvider>
   );
@@ -169,7 +203,7 @@ Drupal.editors.portable_text = {
           toolbar={format.editorSettings.toolbar}
           media={format.editorSettings.media}
           initialValue={parseValue(element.value)}
-          ariaLabel={label ? label.textContent.trim() : Drupal.t('Rich text editor')}
+          ariaLabel={labelText(label)}
           placeholder={element.placeholder || Drupal.t('Start writing…')}
           rows={Number(element.rows) || 5}
           onReady={(editor) => {

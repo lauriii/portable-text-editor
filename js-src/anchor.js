@@ -3,6 +3,8 @@
  * Placing a floating thing next to the caret.
  */
 
+import { useLayoutEffect, useRef, useState } from 'react';
+
 /**
  * Where the caret is on screen.
  *
@@ -28,29 +30,46 @@ function caretRect(editor) {
 }
 
 /**
- * Positions a floating element just below a rect.
+ * Anchors a floating element to the caret, inside the field and out of the way.
  *
- * Measured against the editor's own box rather than the viewport, so that it
- * travels with the caret when the page scrolls instead of being left behind.
+ * Placed below the caret to begin with, then measured and moved if that does
+ * not work: it was going wherever the caret was, so at the right hand edge it
+ * wrapped into three rows and still hung a couple of hundred pixels over the
+ * side of the field into the form beside it, and low down it covered the very
+ * text being edited.
  *
  * @param {object} editor
  *   The editor from useEditor().
- * @param {DOMRect|null} rect
- *   What to sit under, usually the caret.
+ * @param {Array} deps
+ *   What to re-measure on, on top of every render of the element.
  *
- * @return {object|undefined}
- *   A style object, or undefined when there is nothing to measure against.
+ * @return {Array}
+ *   A ref to put on the element, and the style to give it.
  */
-function anchorBelow(editor, rect) {
-  const host = editor.dom.getEditorElement()?.closest('.portable-text-editor');
-  const box = host?.getBoundingClientRect();
-  if (!rect || !box) {
-    return undefined;
-  }
-  return {
-    top: `${rect.bottom - box.top + 4}px`,
-    left: `${Math.max(0, rect.left - box.left)}px`,
-  };
+function useAnchor(editor, deps) {
+  const element = useRef(null);
+  const [style, setStyle] = useState(undefined);
+
+  useLayoutEffect(() => {
+    const host = editor.dom.getEditorElement()?.closest('.portable-text-editor');
+    const rect = caretRect(editor);
+    if (!host || !rect || !element.current) {
+      return;
+    }
+    const box = host.getBoundingClientRect();
+    const own = element.current.getBoundingClientRect();
+    // Never past either edge of the field.
+    const left = Math.max(0, Math.min(rect.left - box.left, box.width - own.width));
+    const below = rect.bottom - box.top + 4;
+    const above = rect.top - box.top - own.height - 4;
+    // Above the caret when there is no room below it and there is room above,
+    // rather than sitting on top of what is being written.
+    const top = below + own.height > box.height && above >= 0 ? above : below;
+    setStyle({ top: `${top}px`, left: `${left}px` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return [element, style];
 }
 
-export { caretRect, anchorBelow };
+export { caretRect, useAnchor };
