@@ -19,6 +19,7 @@ import { BehaviorPlugin, EventListenerPlugin } from '@portabletext/editor/plugin
 import { schemaDefinition, renderStyle, renderDecorator } from './schema.jsx';
 import { markdownBehavior } from './markdown.js';
 import { tabBehavior, indentTarget, moveFocus } from './indent.js';
+import { stepIntoBefore, clearEmptiedBehavior } from './deletion.js';
 import { Toolbar } from './toolbar.jsx';
 import { buildRenderBlock, renderAnnotation } from './render.jsx';
 import { LinkBalloon } from './link.jsx';
@@ -26,7 +27,7 @@ import { SlashMenu } from './slash.jsx';
 import { parseValue, serializeValue } from './value.js';
 
 // Stable, so the plugin does not unregister and register on every render.
-const BEHAVIORS = [markdownBehavior, tabBehavior];
+const BEHAVIORS = [markdownBehavior, tabBehavior, clearEmptiedBehavior];
 
 /**
  * The field's name, taken from its label.
@@ -97,6 +98,19 @@ function Editable({ media, ariaLabel, placeholder, rows, hasLink, onOpenLink, in
         // Tab either nests a list item or leaves the field. It is taken from
         // the editor by a behavior so that it cannot also indent on its own,
         // which is what made a list impossible to Tab out of.
+        // Backspace against a table or an image steps into it rather than
+        // deleting the whole thing in one unremarkable keystroke.
+        if (event.key === 'Backspace') {
+          const into = stepIntoBefore(editor.getSnapshot(), event.currentTarget);
+          if (into) {
+            event.preventDefault();
+            into.focus();
+            if (into.setSelectionRange) {
+              into.setSelectionRange(into.value.length, into.value.length);
+            }
+            return;
+          }
+        }
         if (event.key === 'Tab') {
           event.preventDefault();
           const target = indentTarget(editor.getSnapshot(), event.shiftKey);

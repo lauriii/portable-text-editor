@@ -3,7 +3,7 @@ editor:
   # own schedule, and the URL a browser caches is built from this. Bump it
   # whenever js/portable-text-editor.js is rebuilt, or browsers will keep
   # serving the bundle they already have.
-  version: 1.12.0
+  version: 1.14.0
   js:
     js/portable-text-editor.js: { preprocess: false, minified: true }
   css:
