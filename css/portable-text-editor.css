@@ -344,6 +344,32 @@ html.js
   font-size: 0.8125rem;
 }
 
+/*
+ * A balloon control that is switched on says so. Without this the alignment in
+ * use was invisible, which also made getting back to none undiscoverable:
+ * choosing the one already in use is what clears it.
+ */
+.portable-text-editor__balloon button[aria-pressed="true"] {
+  background: #dbe9f5;
+  color: #003b73;
+}
+
+.portable-text-editor__balloon button[aria-pressed="true"]:hover {
+  background: #c3d9ef;
+}
+
+/*
+ * A linked media item, marked while editing, since the anchor does nothing
+ * here and there would otherwise be no sign that it is one. Qualified by the
+ * field for the same reason the focus rules are: an unqualified class ties
+ * with the admin theme and loses on source order.
+ */
+.portable-text-editor .portable-text-editor__media-link {
+  display: block;
+  outline: 1px dashed #0071b8;
+  outline-offset: 2px;
+}
+
 .portable-text-editor__media img,
 .portable-text-editor__media video,
 .portable-text-editor__media iframe {

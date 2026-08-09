@@ -240,4 +240,4 @@ function LinkBalloon({ request, onClose }) {
   );
 }
 
-export { activeLink, LinkBalloon };
+export { activeLink, withScheme, LinkBalloon };

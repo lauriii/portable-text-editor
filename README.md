@@ -275,6 +275,12 @@ the same way the media button only appears when "Embed media" is. Filter order
 matters and follows from the weights: this filter produces the element,
 `filter_align` and `filter_caption` read it, and `media_embed` renders it last.
 
+Media can also be a link, which is stored on the block and rendered as an
+anchor around the element, the same shape core's own editor produces. The
+address goes through `UrlHelper::filterBadProtocol()` like any other link here,
+and through the same scheme normalising as a link in running text, so a bare
+domain does not become a relative path.
+
 One trap worth knowing when adding another such attribute: the media preview
 endpoint runs the same text format, so the bare `<drupal-media>` element it
 sends arrives back through this filter, which rebuilds it rather than passing

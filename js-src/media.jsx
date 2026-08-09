@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
 import { FACES } from './icons.jsx';
+import { withScheme } from './link.jsx';
 
 /**
  * The alignments offered, which are the ones core's filter understands.
@@ -27,6 +28,10 @@ const FIELDS = {
   caption: {
     label: Drupal.t('Caption'),
     description: Drupal.t('Caption shown beneath this media'),
+  },
+  link: {
+    label: Drupal.t('Link'),
+    description: Drupal.t('Address this media links to'),
   },
 };
 
@@ -70,12 +75,18 @@ function openMediaLibrary(media, onSelect) {
   listening = received;
   jQuery(window).on('editor:dialogsave', received);
 
+  // The media library's own dialog options, which is a grid of pictures and
+  // wants the room. "ui-dialog--narrow" is what core's editors add to every
+  // dialog they open, including the small ones, and on this it left the
+  // library a 500 pixel column in a 1500 pixel window.
+  // @see \Drupal\media_library\MediaLibraryUiBuilder::dialogOptions()
   Drupal.ajax({
     url: media.libraryUrl,
     dialog: {
       title: Drupal.t('Add or select media'),
-      width: 'auto',
-      classes: { 'ui-dialog': 'ui-dialog--narrow' },
+      classes: { 'ui-dialog': 'media-library-widget-modal' },
+      height: '75%',
+      width: '75%',
     },
     dialogType: 'modal',
     selector: '.portable-text-editor-media-loading',
@@ -194,7 +205,11 @@ function MediaBlock({ value, path, media }) {
   };
 
   const keep = () => {
-    const text = writing.text.trim();
+    const typed = writing.text.trim();
+    // A link typed short is a link, here as much as in running text, so it
+    // goes through the same normalising rather than being stored as the
+    // relative path it would otherwise become.
+    const text = writing.field === 'link' ? withScheme(typed) : typed;
     editor.send({
       type: 'block.set',
       at: path,
@@ -278,8 +293,19 @@ function MediaBlock({ value, path, media }) {
       {preview?.html !== undefined ? (
         // Drupal rendered this, for this text format and this user, through
         // its own media pipeline. It is markup on purpose.
-        // eslint-disable-next-line react/no-danger
-        <div dangerouslySetInnerHTML={{ __html: preview.html }} />
+        //
+        // The link is drawn here rather than asked of the preview endpoint,
+        // which only ever renders the media itself: the anchor is this
+        // filter's doing, on the way out.
+        <a
+          className={value.link ? 'portable-text-editor__media-link' : undefined}
+          href={value.link || undefined}
+          title={value.link || undefined}
+          // The caret belongs in the field, not on a followed link.
+          onClick={(event) => event.preventDefault()}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: preview.html }}
+        />
       ) : null}
       {active && writing === null ? (
         <div className="portable-text-editor__balloon" role="toolbar" aria-label={Drupal.t('Media')}>
@@ -299,6 +325,13 @@ function MediaBlock({ value, path, media }) {
               {value.caption ? Drupal.t('Edit caption') : Drupal.t('Add caption')}
             </button>
           ) : null}
+          <button
+            type="button"
+            title={value.link || undefined}
+            onClick={() => setWriting({ field: 'link', text: value.link || '' })}
+          >
+            {value.link ? Drupal.t('Edit link') : Drupal.t('Add link')}
+          </button>
           {media.align ? <span className="portable-text-editor__divider" /> : null}
           {media.align
             ? ALIGNMENTS.map(({ name, label, face }) => (

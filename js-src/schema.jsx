@@ -38,6 +38,7 @@ const schemaDefinition = defineSchema({
         { name: 'viewMode', type: 'string' },
         { name: 'align', type: 'string' },
         { name: 'caption', type: 'string' },
+        { name: 'link', type: 'string' },
         { name: 'alt', type: 'string' },
       ],
     },

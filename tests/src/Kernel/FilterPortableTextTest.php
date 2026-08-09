@@ -236,6 +236,30 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-view-mode="teaser"></drupal-media>',
       ],
+      // Media inside an anchor, which is the shape core's own editor produces
+      // for a linked media item.
+      'media may be a link' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'link' => 'https://example.com/page',
+          ],
+        ],
+        '<a href="https://example.com/page"><drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f"></drupal-media></a>',
+      ],
+      'a media link cannot carry a dangerous protocol' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'link' => 'javascript:alert(1)',
+          ],
+        ],
+        '<a href="alert(1)"><drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f"></drupal-media></a>',
+      ],
       // The caption is core's "Caption images" filter's job, which sanitises
       // it and builds the figure. This only has to hand over the attribute,
       // escaped, so that the quote below cannot end it early.

@@ -241,7 +241,15 @@ class FilterPortableText extends FilterBase {
     if (is_string($block['caption'] ?? NULL) && $block['caption'] !== '') {
       $element .= ' data-caption="' . Html::escape($block['caption']) . '"';
     }
-    return $element . '></drupal-media>';
+    $element .= '></drupal-media>';
+
+    // Media inside an anchor, which is the shape core's own editor produces
+    // for a linked media item. The same protocol filtering as any other link
+    // here, so a javascript: address cannot be smuggled in.
+    if (is_string($block['link'] ?? NULL) && $block['link'] !== '') {
+      return '<a href="' . UrlHelper::filterBadProtocol($block['link']) . '">' . $element . '</a>';
+    }
+    return $element;
   }
 
   /**
