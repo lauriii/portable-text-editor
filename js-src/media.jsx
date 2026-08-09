@@ -12,6 +12,18 @@
 
 import { useEffect, useState } from 'react';
 import { useEditor } from '@portabletext/editor';
+import { FACES } from './icons.jsx';
+
+/**
+ * The alignments offered, which are the ones core's filter understands.
+ *
+ * @see \Drupal\filter\Plugin\Filter\FilterAlign
+ */
+const ALIGNMENTS = [
+  { name: 'left', label: Drupal.t('Align left'), face: FACES.align_left },
+  { name: 'center', label: Drupal.t('Align centre'), face: FACES.align_center },
+  { name: 'right', label: Drupal.t('Align right'), face: FACES.align_right },
+];
 
 /**
  * Opens Drupal's media library and reports back what was chosen.
@@ -70,12 +82,16 @@ function openMediaLibrary(media, onSelect) {
  *   The media item's UUID.
  * @param {string|undefined} alt
  *   Alternative text overriding the media item's own, if there is any.
+ * @param {string|undefined} align
+ *   Which way the media is aligned, if it is.
  *
  * @return {Promise<string>}
  *   The rendered HTML.
  */
-async function fetchPreview(media, uuid, alt) {
-  const attributes = alt ? ` alt="${alt.replace(/"/g, '&quot;')}"` : '';
+async function fetchPreview(media, uuid, alt, align) {
+  const attributes =
+    (alt ? ` alt="${alt.replace(/"/g, '&quot;')}"` : '') +
+    (align ? ` data-align="${align}"` : '');
   const element = `<drupal-media data-entity-type="media" data-entity-uuid="${uuid}"${attributes}></drupal-media>`;
   const response = await fetch(
     `${media.previewUrl}?${new URLSearchParams({ text: element, uuid })}`,
@@ -157,7 +173,7 @@ function MediaBlock({ value, path, media }) {
 
   useEffect(() => {
     let current = true;
-    fetchPreview(media, value.uuid, value.alt)
+    fetchPreview(media, value.uuid, value.alt, value.align)
       .then((html) => {
         if (current) {
           setPreview({ html });
@@ -171,7 +187,7 @@ function MediaBlock({ value, path, media }) {
     return () => {
       current = false;
     };
-  }, [value.uuid, value.alt, media]);
+  }, [value.uuid, value.alt, value.align, media]);
 
   return (
     <div
@@ -236,6 +252,30 @@ function MediaBlock({ value, path, media }) {
           <button type="button" title={value.alt || undefined} onClick={() => setAlt(value.alt || '')}>
             {value.alt ? Drupal.t('Edit alt text') : Drupal.t('Add alt text')}
           </button>
+          {media.align ? <span className="portable-text-editor__divider" /> : null}
+          {media.align
+            ? ALIGNMENTS.map(({ name, label, face }) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-label={label}
+                  title={label}
+                  aria-pressed={(value.align || '') === name}
+                  onClick={() =>
+                    // Choosing the alignment it already has takes it off again,
+                    // which is the only way back to however the theme lays an
+                    // unaligned image out.
+                    editor.send({
+                      type: 'block.set',
+                      at: path,
+                      props: { align: value.align === name ? undefined : name },
+                    })
+                  }
+                >
+                  {face}
+                </button>
+              ))
+            : null}
           <span className="portable-text-editor__divider" />
           <button
             type="button"

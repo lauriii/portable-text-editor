@@ -257,6 +257,19 @@ arguments, Chrome exits as soon as it starts and the failure is reported as
 exact name, logging in fails with "invalid cookie domain", because a cookie
 can only be set for the domain the browser is already on.
 
+### Image alignment
+
+Alignment is core's "Align images" filter (`filter_align`) doing the work. The
+editor stores `align` on the media block, the filter here emits it as
+`data-align`, and core turns that into an `align-left`, `align-center` or
+`align-right` class and takes the attribute away. The media filter, which runs
+later, carries that class onto what it renders.
+
+So the alignment controls only appear when that filter is enabled on the text
+format, in the same way the media button only appears when "Embed media" is.
+Filter order matters and follows from the weights: this filter produces the
+element, `filter_align` reads it, and `media_embed` renders it last.
+
 Coding standards:
 
 ```

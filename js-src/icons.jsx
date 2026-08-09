@@ -125,6 +125,21 @@ const FACES = {
   ),
   // Drawn a pixel higher than they were, which had left both sitting below the
   // centre every other control shares.
+  align_left: (
+    <Icon>
+      <path d="M2 4h12M2 7.5h7M2 11h12M2 14.5h7" {...stroke} strokeWidth={1.4} />
+    </Icon>
+  ),
+  align_center: (
+    <Icon>
+      <path d="M2 4h12M4.5 7.5h7M2 11h12M4.5 14.5h7" {...stroke} strokeWidth={1.4} />
+    </Icon>
+  ),
+  align_right: (
+    <Icon>
+      <path d="M2 4h12M7 7.5h7M2 11h12M7 14.5h7" {...stroke} strokeWidth={1.4} />
+    </Icon>
+  ),
   undo: (
     <Icon>
       <path d="M3 7h6.5a3.5 3.5 0 1 1 0 7H6M3 7l3-3M3 7l3 3" {...stroke} />

@@ -57,6 +57,11 @@ class FilterPortableText extends FilterBase {
   ];
 
   /**
+   * The alignments core's "Align images" filter understands.
+   */
+  protected const ALIGNMENTS = ['left', 'center', 'right'];
+
+  /**
    * List item types, keyed by Portable Text name, valued by wrapper element.
    */
   protected const LIST_TAGS = [
@@ -99,10 +104,12 @@ class FilterPortableText extends FilterBase {
         preg_match('#data-entity-uuid="([^"]*)"#i', $element[1], $uuid);
         preg_match('#data-view-mode="([^"]*)"#i', $element[1], $view_mode);
         preg_match('#\balt="([^"]*)"#i', $element[1], $alt);
+        preg_match('#data-align="([^"]*)"#i', $element[1], $align);
         return $this->renderMedia([
           'uuid' => $uuid[1] ?? NULL,
           'viewMode' => $view_mode[1] ?? NULL,
           'alt' => isset($alt[1]) ? Html::decodeEntities($alt[1]) : NULL,
+          'align' => $align[1] ?? NULL,
         ]);
       }
 
@@ -216,6 +223,15 @@ class FilterPortableText extends FilterBase {
     // @see \Drupal\media\Plugin\Filter\MediaEmbed::renderMissingMediaLink()
     if (is_string($block['alt'] ?? NULL) && $block['alt'] !== '') {
       $element .= ' alt="' . Html::escape($block['alt']) . '"';
+    }
+    // Alignment is core's "Align images" filter's to act on: it turns this
+    // attribute into a class and takes the attribute away, and the media
+    // filter, which runs later, carries that class onto what it renders. Only
+    // the three values that filter understands are passed on, so an unexpected
+    // one cannot reach the page as an attribute nobody handles.
+    // @see \Drupal\filter\Plugin\Filter\FilterAlign
+    if (in_array($block['align'] ?? NULL, self::ALIGNMENTS, TRUE)) {
+      $element .= ' data-align="' . $block['align'] . '"';
     }
     return $element . '></drupal-media>';
   }

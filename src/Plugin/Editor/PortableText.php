@@ -152,6 +152,25 @@ class PortableText extends EditorBase implements ContainerFactoryPluginInterface
   }
 
   /**
+   * Whether a filter is switched on for this editor's text format.
+   *
+   * @param mixed $editor
+   *   The text editor being configured, if there is one yet.
+   * @param string $filter
+   *   The filter plugin's ID.
+   *
+   * @return bool
+   *   TRUE when the format has that filter and it is enabled.
+   */
+  protected function filterIsOn($editor, string $filter): bool {
+    if (!$editor instanceof EditorEntity || !$editor->hasAssociatedFilterFormat()) {
+      return FALSE;
+    }
+    $filters = $editor->getFilterFormat()->filters();
+    return $filters->has($filter) && $filters->get($filter)->status === TRUE;
+  }
+
+  /**
    * Whether media can be embedded in this editor's text format.
    *
    * Media is rendered by core's "Embed media" filter, which also gates access
@@ -170,11 +189,7 @@ class PortableText extends EditorBase implements ContainerFactoryPluginInterface
     if (!$editor instanceof EditorEntity || !$this->moduleHandler->moduleExists('media_library')) {
       return FALSE;
     }
-    if (!$editor->hasAssociatedFilterFormat()) {
-      return FALSE;
-    }
-    $filters = $editor->getFilterFormat()->filters();
-    return $filters->has('media_embed') && $filters->get('media_embed')->status === TRUE;
+    return $this->filterIsOn($editor, 'media_embed');
   }
 
   /**
@@ -190,6 +205,11 @@ class PortableText extends EditorBase implements ContainerFactoryPluginInterface
 
     if (in_array('media', $settings['toolbar'], TRUE) && $this->mediaIsEmbeddable($editor)) {
       $settings['media'] = $this->mediaSettings($editor);
+      // Alignment is core's "Align images" filter doing the work, so it is
+      // only offered when that filter is on: without it the attribute would be
+      // stored and emitted and nothing would ever move.
+      // @see \Drupal\filter\Plugin\Filter\FilterAlign
+      $settings['media']['align'] = $this->filterIsOn($editor, 'filter_align');
     }
     else {
       // Without somewhere to embed media, the button would open a library the

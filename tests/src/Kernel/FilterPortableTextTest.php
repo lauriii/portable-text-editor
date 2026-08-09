@@ -236,6 +236,31 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-view-mode="teaser"></drupal-media>',
       ],
+      // Alignment is core's "Align images" filter's job; this only has to hand
+      // it the attribute it reads.
+      'media may be aligned' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'align' => 'right',
+          ],
+        ],
+        '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-align="right"></drupal-media>',
+      ],
+      // Anything else would be an attribute nobody handles, left on the page.
+      'an alignment nobody understands is dropped' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'align' => 'sideways" onerror="alert(1)',
+          ],
+        ],
+        '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f"></drupal-media>',
+      ],
       'media may carry alternative text' => [
         [
           [

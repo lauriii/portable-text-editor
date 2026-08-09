@@ -298,6 +298,41 @@ html.js
   margin-top: 0;
 }
 
+/*
+ * What core's "Align images" filter produces. The writing area has to draw
+ * these itself: the classes are meant for a front-end theme, and an admin
+ * theme has no reason to know about them, so without this the alignment shows
+ * on the page and not while it is being chosen.
+ */
+.portable-text-editor__editable .align-left {
+  float: left;
+  margin: 0 1em 0.5em 0;
+}
+
+.portable-text-editor__editable .align-right {
+  float: right;
+  margin: 0 0 0.5em 1em;
+}
+
+.portable-text-editor__editable .align-center {
+  margin-inline: auto;
+}
+
+/* The media block shrinks to its content, so centring needs the block moved. */
+.portable-text-editor__media:has(.align-center) {
+  margin-inline: auto;
+}
+
+.portable-text-editor__media:has(.align-left) {
+  float: left;
+  margin-inline-end: 1em;
+}
+
+.portable-text-editor__media:has(.align-right) {
+  float: right;
+  margin-inline-start: 1em;
+}
+
 .portable-text-editor__media img,
 .portable-text-editor__media video,
 .portable-text-editor__media iframe {

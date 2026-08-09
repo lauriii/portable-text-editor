@@ -36,6 +36,7 @@ const schemaDefinition = defineSchema({
       fields: [
         { name: 'uuid', type: 'string' },
         { name: 'viewMode', type: 'string' },
+        { name: 'align', type: 'string' },
         { name: 'alt', type: 'string' },
       ],
     },
