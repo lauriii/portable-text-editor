@@ -299,6 +299,19 @@ html.js
 }
 
 /*
+ * Writing about the media is the exception. That panel is far bigger than the
+ * row of icons, and over the picture it covered the very thing being
+ * described, so it sits under the media instead. It is only there while
+ * something is being typed, which is why covering what follows is a fair trade
+ * here and was not for the controls.
+ */
+.portable-text-editor__media > .portable-text-editor__balloon--form {
+  top: 100%;
+  bottom: auto;
+  margin-top: 4px;
+}
+
+/*
  * What core's "Align images" filter produces. The writing area has to draw
  * these itself: the classes are meant for a front-end theme, and an admin
  * theme has no reason to know about them, so without this the alignment shows

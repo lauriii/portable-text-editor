@@ -405,7 +405,7 @@ function MediaBlock({ value, path, media }) {
         </div>
       ) : null}
       {active && writing !== null ? (
-        <div className="portable-text-editor__balloon">
+        <div className="portable-text-editor__balloon portable-text-editor__balloon--form">
           <span className="portable-text-editor__link-label">{FIELDS[writing.field].label}</span>
           {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <input
