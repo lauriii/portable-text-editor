@@ -108,17 +108,20 @@ const FOCUSABLE = [
  *   Whether Shift was held.
  */
 function moveFocus(from, backwards) {
-  const field = from.closest('.portable-text-editor') || from;
-  // Ordered by where things are in the document rather than by where the
-  // writing area sits among them: it is contenteditable rather than a form
-  // control, so it is not in this list itself, and looking for it landed on
-  // the first focusable thing on the page instead, which is the skip link.
+  // Measured against the writing area rather than looked up among the
+  // focusable elements: it is contenteditable rather than a form control, so
+  // it is not in that list itself, and searching for it landed on the first
+  // focusable thing on the page instead, which is the skip link.
+  //
+  // The field's own toolbar is left in. It sits before the writing area and is
+  // a tab stop like any other, so Shift+Tab belongs there rather than out on
+  // the far side of the field.
   const outside = Array.from(document.querySelectorAll(FOCUSABLE)).filter(
-    (element) => !field.contains(element),
+    (element) => element !== from && !from.contains(element),
   );
   const after = (element) =>
     // eslint-disable-next-line no-bitwise
-    Boolean(field.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+    Boolean(from.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
   const candidates = backwards
     ? outside.filter((element) => !after(element)).reverse()
     : outside.filter(after);

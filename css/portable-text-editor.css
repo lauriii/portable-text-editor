@@ -32,6 +32,16 @@ html.js
 }
 
 .portable-text-editor {
+  /*
+   * Every focus indicator here, and darker than Claro's own focus green, which
+   * is #26a769. That colour is only 2.95:1 against the toolbar and 2.70:1
+   * against a highlighted table cell, so as a 1 pixel ring it failed WCAG's
+   * 3:1 for non-text contrast. This is at least 5.3:1 on every surface it is
+   * drawn on, and 3.27:1 against the unfocused border, so the change of state
+   * carries on its own rather than relying on telling green from grey.
+   */
+  --portable-text-editor-focus: #146b3e;
+
   /* The "/" menu is placed against this box. */
   position: relative;
   border: 1px solid #b7b7b7;
@@ -46,10 +56,10 @@ html.js
  * shouted at once.
  */
 .portable-text-editor:has(.portable-text-editor__editable:focus) {
-  border-color: #26a769;
+  border-color: var(--portable-text-editor-focus);
   /* Soft rather than a second hard edge, which is how CKEditor draws its own
      focus ring, and reads as the field being active rather than as a warning. */
-  box-shadow: 0 0 4px rgba(38, 167, 105, 0.45);
+  box-shadow: 0 0 0 1px var(--portable-text-editor-focus), 0 0 4px rgba(20, 107, 62, 0.4);
 }
 
 /* Everything else inside just darkens the field's edge. */
@@ -91,8 +101,10 @@ html.js
 }
 
 .portable-text-editor .portable-text-editor__button:focus-visible {
-  outline: 1px solid #26a769;
-  outline-offset: -1px;
+  /* Two pixels, which is what WCAG 2.2 asks of a focus indicator and what
+     Drupal is moving towards. */
+  outline: 2px solid var(--portable-text-editor-focus);
+  outline-offset: -2px;
   box-shadow: none;
 }
 
@@ -267,7 +279,10 @@ html.js
  * was Claro's five pixel ring in place of each of these.
  */
 .portable-text-editor .portable-text-editor__media:focus {
-  box-shadow: 0 0 0 1px #26a769;
+  /* Thicker than the grey of being merely pointed at, so the two are told
+     apart by weight and not only by colour. Backspace deletes what this ring
+     is around, which is worth saying clearly. */
+  box-shadow: 0 0 0 2px var(--portable-text-editor-focus);
   outline: none;
 }
 
@@ -347,7 +362,7 @@ html.js
 
 .portable-text-editor__resize:hover,
 .portable-text-editor__resize:active {
-  background: #26a769;
+  background: var(--portable-text-editor-focus);
 }
 
 .portable-text-editor__cell {
@@ -377,7 +392,7 @@ html.js
   /* Inset rather than an outline: the table collapses its borders, so a
      neighbouring cell paints over two sides of an outline and leaves a corner
      rather than a ring. */
-  box-shadow: inset 0 0 0 1px #26a769;
+  box-shadow: inset 0 0 0 2px var(--portable-text-editor-focus);
   outline: none;
 }
 
