@@ -35,6 +35,27 @@ const FIELDS = {
   },
 };
 
+const WRITABLE = [
+  {
+    field: 'alt',
+    add: Drupal.t('Add alt text'),
+    edit: Drupal.t('Edit alt text'),
+    face: FACES.alt_text,
+  },
+  {
+    field: 'caption',
+    add: Drupal.t('Add caption'),
+    edit: Drupal.t('Edit caption'),
+    face: FACES.caption,
+  },
+  {
+    field: 'link',
+    add: Drupal.t('Add link'),
+    edit: Drupal.t('Edit link'),
+    face: FACES.link,
+  },
+];
+
 const ALIGNMENTS = [
   { name: 'left', label: Drupal.t('Align left'), face: FACES.align_left },
   { name: 'center', label: Drupal.t('Align centre'), face: FACES.align_center },
@@ -199,6 +220,14 @@ function MediaBlock({ value, path, media }) {
   // so they share one.
   const [writing, setWriting] = useState(null);
 
+  const removeSelf = () => {
+    editor.send({ type: 'delete.block', at: path });
+    // Deferred, because the focus is on something that is about to be taken
+    // off the page: asking for it back in the same tick left it on nothing,
+    // and the writer could not carry on typing.
+    setTimeout(() => editor.send({ type: 'focus' }), 0);
+  };
+
   const stopWriting = () => {
     setWriting(null);
     editor.send({ type: 'focus' });
@@ -261,10 +290,13 @@ function MediaBlock({ value, path, media }) {
         }
         if (event.key === 'Backspace' || event.key === 'Delete') {
           event.preventDefault();
-          editor.send({ type: 'delete.block', at: path });
-          // The media held the focus, and it is gone, so hand it back to the
-          // writing area rather than leaving it on the page.
-          editor.send({ type: 'focus' });
+          removeSelf();
+          return;
+        }
+        // The gesture anyone reaches for to link the thing they have selected.
+        if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          setWriting({ field: 'link', text: value.link || '' });
         }
       }}
       onBlur={(event) => {
@@ -309,29 +341,24 @@ function MediaBlock({ value, path, media }) {
       ) : null}
       {active && writing === null ? (
         <div className="portable-text-editor__balloon" role="toolbar" aria-label={Drupal.t('Media')}>
-          <button
-            type="button"
-            title={value.alt || undefined}
-            onClick={() => setWriting({ field: 'alt', text: value.alt || '' })}
-          >
-            {value.alt ? Drupal.t('Edit alt text') : Drupal.t('Add alt text')}
-          </button>
-          {media.caption ? (
-            <button
-              type="button"
-              title={value.caption || undefined}
-              onClick={() => setWriting({ field: 'caption', text: value.caption || '' })}
-            >
-              {value.caption ? Drupal.t('Edit caption') : Drupal.t('Add caption')}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            title={value.link || undefined}
-            onClick={() => setWriting({ field: 'link', text: value.link || '' })}
-          >
-            {value.link ? Drupal.t('Edit link') : Drupal.t('Add link')}
-          </button>
+          {WRITABLE.filter(({ field }) => field !== 'caption' || media.caption).map(
+            ({ field, add, edit, face }) => (
+              <button
+                key={field}
+                type="button"
+                aria-label={value[field] ? edit : add}
+                // The value itself, so an icon that is switched on can still
+                // say what it is switched on to.
+                title={value[field] ? `${edit}: ${value[field]}` : add}
+                // Pressed when the thing is set, which is what the words used
+                // to say before these became icons.
+                aria-pressed={Boolean(value[field])}
+                onClick={() => setWriting({ field, text: value[field] || '' })}
+              >
+                {face}
+              </button>
+            ),
+          )}
           {media.align ? <span className="portable-text-editor__divider" /> : null}
           {media.align
             ? ALIGNMENTS.map(({ name, label, face }) => (
@@ -359,6 +386,8 @@ function MediaBlock({ value, path, media }) {
           <span className="portable-text-editor__divider" />
           <button
             type="button"
+            aria-label={Drupal.t('Replace')}
+            title={Drupal.t('Replace')}
             onClick={() =>
               openMediaLibrary(media, (uuid) =>
                 // The alt text described the picture that was here before, so
@@ -368,16 +397,10 @@ function MediaBlock({ value, path, media }) {
               )
             }
           >
-            {Drupal.t('Replace')}
+            {FACES.replace}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              editor.send({ type: 'delete.block', at: path });
-              editor.send({ type: 'focus' });
-            }}
-          >
-            {Drupal.t('Remove')}
+          <button type="button" aria-label={Drupal.t('Remove')} title={Drupal.t('Remove')} onClick={removeSelf}>
+            {FACES.remove}
           </button>
         </div>
       ) : null}

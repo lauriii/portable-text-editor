@@ -289,12 +289,17 @@ function StyleSelect({ index }) {
 function LinkButton({ index, open, onOpen }) {
   const editor = useEditor();
   const active = useEditorState(editor, isActiveAnnotation('link'));
+  // A link here goes on text. With the caret on a table or an image there is
+  // no text to put one on, and the button used to open a field that then
+  // linked nothing at all. Those carry their own link control instead.
+  const inText = useEditorState(editor, (snapshot) => getFocusTextBlock(snapshot) !== undefined);
   const label = active ? Drupal.t('Edit link') : Drupal.t('Link');
 
   return (
     <button
       type="button"
       className="portable-text-editor__button"
+      disabled={!inText}
       aria-pressed={active || open}
       aria-expanded={open}
       aria-label={label}

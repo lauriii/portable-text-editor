@@ -125,6 +125,33 @@ const FACES = {
   ),
   // Drawn a pixel higher than they were, which had left both sitting below the
   // centre every other control shares.
+  // A picture with an A in it: the text that stands in for the picture.
+  alt_text: (
+    <Icon>
+      <rect x="1.6" y="3" width="12.8" height="10" rx="1.4" {...stroke} strokeWidth={1.3} />
+      <text x="8" y="11" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor">
+        A
+      </text>
+    </Icon>
+  ),
+  // A picture with a line of text under it.
+  caption: (
+    <Icon>
+      <rect x="1.6" y="2.4" width="12.8" height="8" rx="1.4" {...stroke} strokeWidth={1.3} />
+      <path d="M2.5 13h11M2.5 15.2h7" {...stroke} strokeWidth={1.3} />
+    </Icon>
+  ),
+  // Two arrows going opposite ways: this one for another one.
+  replace: (
+    <Icon>
+      <path d="M2 5.5h9.5l-2.5-2.5M14 10.5H4.5l2.5 2.5" {...stroke} strokeWidth={1.4} />
+    </Icon>
+  ),
+  remove: (
+    <Icon>
+      <path d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.7 9h4.6l.7-9" {...stroke} strokeWidth={1.3} />
+    </Icon>
+  ),
   align_left: (
     <Icon>
       <path d="M2 4h12M2 7.5h7M2 11h12M2 14.5h7" {...stroke} strokeWidth={1.4} />
