@@ -236,6 +236,20 @@ class FilterPortableTextTest extends KernelTestBase {
         ],
         '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-view-mode="teaser"></drupal-media>',
       ],
+      // The caption is core's "Caption images" filter's job, which sanitises
+      // it and builds the figure. This only has to hand over the attribute,
+      // escaped, so that the quote below cannot end it early.
+      'media may carry a caption' => [
+        [
+          [
+            '_type' => 'media',
+            '_key' => 'm1',
+            'uuid' => '0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+            'caption' => 'A "quoted" <b>caption</b>',
+          ],
+        ],
+        '<drupal-media data-entity-type="media" data-entity-uuid="0e1b2c3d-4a5b-6c7d-8e9f-0a1b2c3d4e5f" data-caption="A &quot;quoted&quot; &lt;b&gt;caption&lt;/b&gt;"></drupal-media>',
+      ],
       // Alignment is core's "Align images" filter's job; this only has to hand
       // it the attribute it reads.
       'media may be aligned' => [

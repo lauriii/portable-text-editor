@@ -257,7 +257,7 @@ arguments, Chrome exits as soon as it starts and the failure is reported as
 exact name, logging in fails with "invalid cookie domain", because a cookie
 can only be set for the domain the browser is already on.
 
-### Image alignment
+### Alignment and captions
 
 Alignment is core's "Align images" filter (`filter_align`) doing the work. The
 editor stores `align` on the media block, the filter here emits it as
@@ -265,10 +265,21 @@ editor stores `align` on the media block, the filter here emits it as
 `align-right` class and takes the attribute away. The media filter, which runs
 later, carries that class onto what it renders.
 
-So the alignment controls only appear when that filter is enabled on the text
-format, in the same way the media button only appears when "Embed media" is.
-Filter order matters and follows from the weights: this filter produces the
-element, `filter_align` reads it, and `media_embed` renders it last.
+Captions work the same way, through core's "Caption images" filter
+(`filter_caption`): the block carries `caption`, this filter emits it as
+`data-caption`, and core sanitises it down to a few inline tags and wraps the
+media in a `figure` with a `figcaption`.
+
+So each control only appears when its filter is enabled on the text format, in
+the same way the media button only appears when "Embed media" is. Filter order
+matters and follows from the weights: this filter produces the element,
+`filter_align` and `filter_caption` read it, and `media_embed` renders it last.
+
+One trap worth knowing when adding another such attribute: the media preview
+endpoint runs the same text format, so the bare `<drupal-media>` element it
+sends arrives back through this filter, which rebuilds it rather than passing
+it along. An attribute the rebuild does not know about is silently lost in the
+writing area while working perfectly on the rendered page.
 
 Coding standards:
 

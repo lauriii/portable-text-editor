@@ -105,11 +105,13 @@ class FilterPortableText extends FilterBase {
         preg_match('#data-view-mode="([^"]*)"#i', $element[1], $view_mode);
         preg_match('#\balt="([^"]*)"#i', $element[1], $alt);
         preg_match('#data-align="([^"]*)"#i', $element[1], $align);
+        preg_match('#data-caption="([^"]*)"#i', $element[1], $caption);
         return $this->renderMedia([
           'uuid' => $uuid[1] ?? NULL,
           'viewMode' => $view_mode[1] ?? NULL,
           'alt' => isset($alt[1]) ? Html::decodeEntities($alt[1]) : NULL,
           'align' => $align[1] ?? NULL,
+          'caption' => isset($caption[1]) ? Html::decodeEntities($caption[1]) : NULL,
         ]);
       }
 
@@ -232,6 +234,12 @@ class FilterPortableText extends FilterBase {
     // @see \Drupal\filter\Plugin\Filter\FilterAlign
     if (in_array($block['align'] ?? NULL, self::ALIGNMENTS, TRUE)) {
       $element .= ' data-align="' . $block['align'] . '"';
+    }
+    // Core's "Caption images" filter reads this one, sanitises it down to a
+    // few inline tags and wraps the media in a figure.
+    // @see \Drupal\filter\Plugin\Filter\FilterCaption
+    if (is_string($block['caption'] ?? NULL) && $block['caption'] !== '') {
+      $element .= ' data-caption="' . Html::escape($block['caption']) . '"';
     }
     return $element . '></drupal-media>';
   }

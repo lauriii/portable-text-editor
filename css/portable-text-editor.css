@@ -333,6 +333,17 @@ html.js
   margin-inline-start: 1em;
 }
 
+/* What core's "Caption images" filter produces. */
+.portable-text-editor__editable figure {
+  margin: 0;
+}
+
+.portable-text-editor__editable figcaption {
+  padding-top: 4px;
+  color: #55565b;
+  font-size: 0.8125rem;
+}
+
 .portable-text-editor__media img,
 .portable-text-editor__media video,
 .portable-text-editor__media iframe {

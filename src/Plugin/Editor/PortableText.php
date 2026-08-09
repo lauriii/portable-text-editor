@@ -210,6 +210,10 @@ class PortableText extends EditorBase implements ContainerFactoryPluginInterface
       // stored and emitted and nothing would ever move.
       // @see \Drupal\filter\Plugin\Filter\FilterAlign
       $settings['media']['align'] = $this->filterIsOn($editor, 'filter_align');
+      // Likewise the caption, which core's "Caption images" filter turns into
+      // a figure and a figcaption.
+      // @see \Drupal\filter\Plugin\Filter\FilterCaption
+      $settings['media']['caption'] = $this->filterIsOn($editor, 'filter_caption');
     }
     else {
       // Without somewhere to embed media, the button would open a library the

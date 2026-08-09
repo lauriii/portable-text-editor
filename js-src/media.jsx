@@ -19,6 +19,17 @@ import { FACES } from './icons.jsx';
  *
  * @see \Drupal\filter\Plugin\Filter\FilterAlign
  */
+const FIELDS = {
+  alt: {
+    label: Drupal.t('Alt text'),
+    description: Drupal.t('Alternative text for this media'),
+  },
+  caption: {
+    label: Drupal.t('Caption'),
+    description: Drupal.t('Caption shown beneath this media'),
+  },
+};
+
 const ALIGNMENTS = [
   { name: 'left', label: Drupal.t('Align left'), face: FACES.align_left },
   { name: 'center', label: Drupal.t('Align centre'), face: FACES.align_center },
@@ -84,14 +95,18 @@ function openMediaLibrary(media, onSelect) {
  *   Alternative text overriding the media item's own, if there is any.
  * @param {string|undefined} align
  *   Which way the media is aligned, if it is.
+ * @param {string|undefined} caption
+ *   The caption shown beneath it, if it has one.
  *
  * @return {Promise<string>}
  *   The rendered HTML.
  */
-async function fetchPreview(media, uuid, alt, align) {
+async function fetchPreview(media, uuid, alt, align, caption) {
+  const quoted = (text) => text.replace(/"/g, '&quot;');
   const attributes =
-    (alt ? ` alt="${alt.replace(/"/g, '&quot;')}"` : '') +
-    (align ? ` data-align="${align}"` : '');
+    (alt ? ` alt="${quoted(alt)}"` : '') +
+    (align ? ` data-align="${align}"` : '') +
+    (caption ? ` data-caption="${quoted(caption)}"` : '');
   const element = `<drupal-media data-entity-type="media" data-entity-uuid="${uuid}"${attributes}></drupal-media>`;
   const response = await fetch(
     `${media.previewUrl}?${new URLSearchParams({ text: element, uuid })}`,
@@ -168,12 +183,31 @@ function MediaBlock({ value, path, media }) {
   const editor = useEditor();
   const [preview, setPreview] = useState(null);
   const [active, setActive] = useState(false);
-  // A string means the alt text is being edited; null means it is not.
-  const [alt, setAlt] = useState(null);
+  // Which text property is being written, and what has been typed into it so
+  // far. Null when none is. Alt text and the caption are the same interaction,
+  // so they share one.
+  const [writing, setWriting] = useState(null);
+
+  const stopWriting = () => {
+    setWriting(null);
+    editor.send({ type: 'focus' });
+  };
+
+  const keep = () => {
+    const text = writing.text.trim();
+    editor.send({
+      type: 'block.set',
+      at: path,
+      // Emptying it takes the property off rather than storing an empty string,
+      // so that "Add" and "Edit" go on telling the truth.
+      props: { [writing.field]: text === '' ? undefined : text },
+    });
+    stopWriting();
+  };
 
   useEffect(() => {
     let current = true;
-    fetchPreview(media, value.uuid, value.alt, value.align)
+    fetchPreview(media, value.uuid, value.alt, value.align, value.caption)
       .then((html) => {
         if (current) {
           setPreview({ html });
@@ -187,7 +221,7 @@ function MediaBlock({ value, path, media }) {
     return () => {
       current = false;
     };
-  }, [value.uuid, value.alt, value.align, media]);
+  }, [value.uuid, value.alt, value.align, value.caption, media]);
 
   return (
     <div
@@ -225,7 +259,7 @@ function MediaBlock({ value, path, media }) {
       }}
       onMouseEnter={() => setActive(true)}
       onMouseLeave={(event) => {
-        if (alt === null && !event.currentTarget.contains(document.activeElement)) {
+        if (writing === null && !event.currentTarget.contains(document.activeElement)) {
           setActive(false);
         }
       }}
@@ -247,11 +281,24 @@ function MediaBlock({ value, path, media }) {
         // eslint-disable-next-line react/no-danger
         <div dangerouslySetInnerHTML={{ __html: preview.html }} />
       ) : null}
-      {active && alt === null ? (
+      {active && writing === null ? (
         <div className="portable-text-editor__balloon" role="toolbar" aria-label={Drupal.t('Media')}>
-          <button type="button" title={value.alt || undefined} onClick={() => setAlt(value.alt || '')}>
+          <button
+            type="button"
+            title={value.alt || undefined}
+            onClick={() => setWriting({ field: 'alt', text: value.alt || '' })}
+          >
             {value.alt ? Drupal.t('Edit alt text') : Drupal.t('Add alt text')}
           </button>
+          {media.caption ? (
+            <button
+              type="button"
+              title={value.caption || undefined}
+              onClick={() => setWriting({ field: 'caption', text: value.caption || '' })}
+            >
+              {value.caption ? Drupal.t('Edit caption') : Drupal.t('Add caption')}
+            </button>
+          ) : null}
           {media.align ? <span className="portable-text-editor__divider" /> : null}
           {media.align
             ? ALIGNMENTS.map(({ name, label, face }) => (
@@ -301,47 +348,32 @@ function MediaBlock({ value, path, media }) {
           </button>
         </div>
       ) : null}
-      {active && alt !== null ? (
+      {active && writing !== null ? (
         <div className="portable-text-editor__balloon">
-          <span className="portable-text-editor__link-label">{Drupal.t('Alt text')}</span>
+          <span className="portable-text-editor__link-label">{FIELDS[writing.field].label}</span>
           {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <input
             type="text"
             autoFocus
             className="portable-text-editor__link-input"
-            aria-label={Drupal.t('Alternative text for this media')}
-            value={alt}
-            onChange={(changed) => setAlt(changed.target.value)}
+            aria-label={FIELDS[writing.field].description}
+            value={writing.text}
+            onChange={(changed) => setWriting({ ...writing, text: changed.target.value })}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
                 event.preventDefault();
-                setAlt(null);
+                stopWriting();
               }
               if (event.key === 'Enter') {
                 event.preventDefault();
-                editor.send({ type: 'block.set', at: path, props: { alt: alt.trim() } });
-                setAlt(null);
-                editor.send({ type: 'focus' });
+                keep();
               }
             }}
           />
-          <button
-            type="button"
-            onClick={() => {
-              editor.send({ type: 'block.set', at: path, props: { alt: alt.trim() } });
-              setAlt(null);
-              editor.send({ type: 'focus' });
-            }}
-          >
+          <button type="button" onClick={keep}>
             {Drupal.t('Save')}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAlt(null);
-              editor.send({ type: 'focus' });
-            }}
-          >
+          <button type="button" onClick={stopWriting}>
             {Drupal.t('Cancel')}
           </button>
         </div>
