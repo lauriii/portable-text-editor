@@ -53,7 +53,7 @@ function serializeValue(value) {
   if (!Array.isArray(value) || value.length === 0) {
     return '';
   }
-  // ponytail: "empty" means no span has text. Revisit if block objects such as
+  // "empty" means no span has text. Revisit if block objects such as
   // images are ever added to the schema, since those carry no text.
   const hasContent = value.some((block) =>
     Array.isArray(block.children)

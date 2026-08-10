@@ -625,7 +625,7 @@ html.js
 }
 
 /*
- * ponytail: indenting is spelled out per level because CSS cannot multiply by
+ * Indenting is spelled out per level because CSS cannot multiply by
  * an attribute value. Five levels is deeper than anyone nests in a body field;
  * add more rules if that turns out to be wrong.
  */
